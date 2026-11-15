@@ -62,10 +62,10 @@ object IsbnLookup {
             throw IOException("ISBN 应为 10 位或 13 位，你输入的是 ${isbn.length} 位")
         }
 
-        val google = async { runCatching { google(isbn) } }
-        val open = async { runCatching { openLibrary(isbn) } }
-        val g = google.await().getOrNull()
-        val o = open.await().getOrNull()
+        val googleDeferred = async { runCatching { google(isbn) } }
+        val openDeferred = async { runCatching { openLibrary(isbn) } }
+        val g = googleDeferred.await().getOrNull()
+        val o = openDeferred.await().getOrNull()
 
         g ?: o ?: throw IOException(
             "没查到这本书。可能是网络无法访问 Google Books / Open Library，" +
