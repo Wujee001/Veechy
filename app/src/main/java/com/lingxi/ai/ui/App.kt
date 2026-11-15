@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -50,11 +51,11 @@ fun App(vm: MainViewModel = viewModel()) {
     }
 
     GradientBackground {
+        Box(Modifier.fillMaxSize()) {
         when (screen) {
             Screen.MAIN -> Scaffold(
                 modifier = Modifier.imePadding(),
                 containerColor = Color.Transparent,
-                snackbarHost = { SnackbarHost(snackbar) },
                 bottomBar = { AppBottomBar(tab) { tab = it } }
             ) { inner ->
                 Box(Modifier.fillMaxSize().padding(inner)) {
@@ -77,6 +78,15 @@ fun App(vm: MainViewModel = viewModel()) {
             Screen.KNOWLEDGE -> SwipeBackContainer(onBack = { screen = Screen.SETTINGS }) {
                 KnowledgeScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
             }
+        }
+
+            // 全局提示：任何页面都能看到失败原因
+            SnackbarHost(
+                hostState = snackbar,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 16.dp, vertical = 96.dp)
+            )
         }
     }
 }

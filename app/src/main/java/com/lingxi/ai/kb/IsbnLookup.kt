@@ -1,6 +1,7 @@
 package com.lingxi.ai.kb
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -44,21 +45,32 @@ object IsbnLookup {
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(9, TimeUnit.SECONDS)
         .build()
 
     private fun normalize(raw: String): String =
         raw.filter { it.isDigit() || it == 'X' || it == 'x' }.uppercase()
 
+    /**
+     * 两个公开源并发查询，谁先返回可用结果用谁；都失败时给出可读原因。
+     */
     suspend fun lookup(raw: String): BookInfo = withContext(Dispatchers.IO) {
         val isbn = normalize(raw)
         if (isbn.length != 10 && isbn.length != 13) {
-            throw IOException("ISBN 应为 10 位或 13 位")
+            throw IOException("ISBN 应为 10 位或 13 位，你输入的是 ${isbn.length} 位")
         }
-        runCatching { google(isbn) }.getOrNull()
-            ?: runCatching { openLibrary(isbn) }.getOrNull()
-            ?: throw IOException("没有查到这本书")
+
+        val google = async { runCatching { google(isbn) } }
+        val open = async { runCatching { openLibrary(isbn) } }
+        val g = google.await().getOrNull()
+        val o = open.await().getOrNull()
+
+        g ?: o ?: throw IOException(
+            "没查到这本书。可能是网络无法访问 Google Books / Open Library，" +
+                "或该 ISBN 未收录。可稍后重试，或直接上传电子版。"
+        )
     }
 
     // ---------------------------------------------------------------- Google Books

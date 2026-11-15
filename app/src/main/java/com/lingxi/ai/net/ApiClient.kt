@@ -5,8 +5,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
@@ -155,6 +157,43 @@ class ApiClient {
             }
         } finally {
             handle?.dispose()
+        }
+    }
+
+    // ------------------------------------------------------------ 语音转写
+
+    /**
+     * 上传 WAV 到 OpenAI 兼容的 /audio/transcriptions。
+     * 端点不支持时抛 IOException，由调用方提示改用系统识别。
+     */
+    suspend fun transcribe(
+        base: String,
+        key: String,
+        file: java.io.File,
+        model: String = "whisper-1"
+    ): String = withContext(Dispatchers.IO) {
+        val body = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", file.name, file.asRequestBody("audio/wav".toMediaType()))
+            .addFormDataPart("model", model)
+            .addFormDataPart("response_format", "json")
+            .build()
+
+        val req = Request.Builder()
+            .url(endpoint(base, "/audio/transcriptions"))
+            .apply { if (key.isNotBlank()) header("Authorization", "Bearer $key") }
+            .post(body)
+            .build()
+
+        client.newCall(req).execute().use { resp ->
+            val bodyText = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
+                throw IOException("HTTP ${resp.code} ${extractError(bodyText)}")
+            }
+            runCatching { JSONObject(bodyText).optString("text") }
+                .getOrDefault(bodyText)
+                .trim()
+                .ifBlank { throw IOException("转写结果为空") }
         }
     }
 

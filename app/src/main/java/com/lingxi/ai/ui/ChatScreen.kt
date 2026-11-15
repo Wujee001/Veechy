@@ -298,7 +298,7 @@ fun MessageBubble(m: ChatMessage) {
 
         Column(
             Modifier
-                .widthIn(max = 300.dp)
+                .widthIn(max = 330.dp)
                 .clip(
                     RoundedCornerShape(
                         topStart = 18.dp,
@@ -342,11 +342,20 @@ fun MessageBubble(m: ChatMessage) {
                 if (m.role == "assistant") "思考中…" else ""
             }
             if (body.isNotBlank()) {
-                Text(
-                    body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isUser) Color.White else if (m.error) Color(0xFFE5484D) else Ink
-                )
+                val textColor = when {
+                    m.error -> Color(0xFFE5484D)
+                    isUser -> Color.White
+                    else -> Ink
+                }
+                if (isUser) {
+                    Text(body, style = MaterialTheme.typography.bodyMedium, color = textColor)
+                } else {
+                    MarkdownText(
+                        text = body,
+                        color = textColor,
+                        baseStyle = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
     }

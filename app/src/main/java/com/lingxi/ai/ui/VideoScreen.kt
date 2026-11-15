@@ -141,6 +141,16 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             }
         }
 
+        if (!speech.available) {
+            Text(
+                "这台设备没有系统语音识别服务，视觉页只能用「看一眼」手动取帧；" +
+                    "语音问答请到「语音」页切到「录音转写」。",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFE5484D),
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+            )
+        }
+
         Box(
             Modifier
                 .fillMaxWidth()

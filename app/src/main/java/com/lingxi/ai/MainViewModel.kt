@@ -445,6 +445,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         bookPreview = null
     }
 
+    // ------------------------------------------------------------ 语音转写兜底
+
+    var sttBusy by mutableStateOf(false)
+        private set
+
+    /** 录音文件走服务端 /audio/transcriptions 转写后直接发送。 */
+    fun transcribeAndSend(file: File) {
+        val provider = activeProvider
+        if (provider == null) {
+            status = "请先在设置里添加 API 供应商"
+            return
+        }
+        if (provider.apiKey.isBlank()) {
+            status = "API Key 未填写"
+            return
+        }
+        if (sttBusy) return
+
+        viewModelScope.launch {
+            sttBusy = true
+            val result = runCatching { api.transcribe(provider.baseUrl, provider.apiKey, file) }
+            sttBusy = false
+            runCatching { file.delete() }
+            result.onSuccess { text ->
+                if (text.isBlank()) status = "没听清，再说一次" else send(text, speak = true)
+            }.onFailure {
+                status = "转写失败：${it.message}（当前服务可能不支持 /audio/transcriptions，可换回系统识别）"
+            }
+        }
+    }
+
     // ------------------------------------------------------------ 设置写入
 
     fun updateTemperature(v: Float) {

@@ -24,6 +24,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Visibility
@@ -236,7 +238,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenKnowledge: () ->
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.1.0", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.2.0", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -285,6 +287,8 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenKnowledge: () ->
 @Composable
 private fun ProviderCard(vm: MainViewModel, provider: Provider, onDelete: () -> Unit) {
     var reveal by remember { mutableStateOf(false) }
+    var expanded by remember(provider.id) { mutableStateOf(false) }
+    var filter by remember { mutableStateOf("") }
 
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -378,55 +382,100 @@ private fun ProviderCard(vm: MainViewModel, provider: Provider, onDelete: () -> 
             }
 
             Spacer(Modifier.height(12.dp))
-            Text(
-                "模型 · ${provider.models.size}",
-                style = MaterialTheme.typography.labelSmall,
-                color = InkSoft
-            )
-            Spacer(Modifier.height(6.dp))
 
-            if (provider.models.isEmpty()) {
+            val currentModel = if (vm.activeProviderId == provider.id) vm.activeModelId else null
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { expanded = !expanded }
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "模型 · ${provider.models.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = InkSoft
+                    )
+                    Text(
+                        currentModel ?: "未选择（点右侧展开）",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (currentModel != null) Purple else InkSoft.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Text(
-                    "还没有模型，点「同步模型」拉取",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = InkSoft.copy(alpha = 0.75f)
+                    if (expanded) "收起" else "选择模型",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Purple
                 )
-            } else {
-                provider.models.forEach { m ->
-                    val selected = vm.activeProviderId == provider.id && vm.activeModelId == m.id
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (selected) PurpleSoft.copy(alpha = 0.65f) else Color.Transparent)
-                            .clickable { vm.selectModel(provider.id, m.id) }
-                            .padding(horizontal = 8.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = selected,
-                            onClick = { vm.selectModel(provider.id, m.id) },
-                            colors = RadioButtonDefaults.colors(selectedColor = Purple, unselectedColor = LineSoft),
-                            modifier = Modifier.size(30.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            m.id,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (selected) Ink else InkSoft,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (m.vision) {
-                            Spacer(Modifier.width(4.dp))
-                            Badge("图", Blue)
+                Icon(
+                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = null,
+                    tint = Purple,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            if (expanded) {
+                if (provider.models.isEmpty()) {
+                    Text(
+                        "还没有模型，点「同步模型」拉取",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = InkSoft.copy(alpha = 0.75f)
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = filter,
+                        onValueChange = { filter = it },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        singleLine = true,
+                        placeholder = {
+                            Text("搜索模型名", style = MaterialTheme.typography.bodySmall)
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = fieldColors()
+                    )
+                    provider.models
+                        .filter { filter.isBlank() || it.id.contains(filter, ignoreCase = true) }
+                        .forEach { m ->
+                            val selected = vm.activeProviderId == provider.id && vm.activeModelId == m.id
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (selected) PurpleSoft.copy(alpha = 0.65f) else Color.Transparent)
+                                    .clickable { vm.selectModel(provider.id, m.id) }
+                                    .padding(horizontal = 8.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selected,
+                                    onClick = { vm.selectModel(provider.id, m.id) },
+                                    colors = RadioButtonDefaults.colors(selectedColor = Purple, unselectedColor = LineSoft),
+                                    modifier = Modifier.size(30.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    m.id,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (selected) Ink else InkSoft,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (m.vision) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Badge("图", Blue)
+                                }
+                                if (m.audio) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Badge("音", Purple)
+                                }
+                            }
                         }
-                        if (m.audio) {
-                            Spacer(Modifier.width(4.dp))
-                            Badge("音", Purple)
-                        }
-                    }
                 }
             }
         }
