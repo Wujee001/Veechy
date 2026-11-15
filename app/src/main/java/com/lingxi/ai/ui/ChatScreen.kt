@@ -329,15 +329,6 @@ fun MessageBubble(m: ChatMessage) {
                 }
             }
 
-            m.reasoning?.takeIf { it.isNotBlank() }?.let { r ->
-                Text(
-                    "思考 · ${r.take(120)}${if (r.length > 120) "…" else ""}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isUser) Color.White.copy(alpha = 0.8f) else InkSoft.copy(alpha = 0.8f)
-                )
-                Spacer(Modifier.height(4.dp))
-            }
-
             val body = m.text.ifBlank {
                 if (m.role == "assistant") "思考中…" else ""
             }

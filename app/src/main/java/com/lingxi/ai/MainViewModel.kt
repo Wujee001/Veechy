@@ -311,7 +311,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         streaming = true
         job = viewModelScope.launch {
             var acc = ""
-            var reason = ""
             try {
                 val hits = if (kbEnabled) {
                     withContext(Dispatchers.IO) { kb.search(text, 3) }
@@ -334,10 +333,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         acc += d
                         patchLast { it.copy(text = acc) }
                     },
-                    onReasoning = { r ->
-                        reason += r
-                        patchLast { it.copy(reasoning = reason) }
-                    },
+                    // 思考过程不展示，也不落库
                     enableSearch = provider.search
                 )
                 if (acc.isBlank()) {
