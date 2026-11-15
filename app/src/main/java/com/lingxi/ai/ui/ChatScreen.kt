@@ -72,11 +72,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lingxi.ai.MainViewModel
 import com.lingxi.ai.data.ChatMessage
+import com.lingxi.ai.data.InnerVoice
 import com.lingxi.ai.media.MediaUtil
 import com.lingxi.ai.ui.theme.Blue
 import com.lingxi.ai.ui.theme.Ink
@@ -329,7 +331,18 @@ fun MessageBubble(m: ChatMessage) {
                 }
             }
 
-            val body = m.text.ifBlank {
+            val (thought, rawBody) = remember(m.text) { InnerVoice.split(m.text) }
+            if (thought != null) {
+                Text(
+                    "（$thought）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isUser) Color.White.copy(alpha = 0.8f) else InkSoft,
+                    fontStyle = FontStyle.Italic
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+
+            val body = rawBody.ifBlank {
                 if (m.role == "assistant") "思考中…" else ""
             }
             if (body.isNotBlank()) {

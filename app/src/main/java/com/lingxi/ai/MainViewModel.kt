@@ -11,6 +11,7 @@ import com.lingxi.ai.audio.TtsPlayer
 import com.lingxi.ai.data.ChatMessage
 import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
+import com.lingxi.ai.data.InnerVoice
 import com.lingxi.ai.data.Persona
 import com.lingxi.ai.data.Provider
 import com.lingxi.ai.data.SettingsStore
@@ -339,7 +340,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (acc.isBlank()) {
                     patchLast { it.copy(text = "（模型没有返回内容）") }
                 } else if (speak || autoSpeak) {
-                    tts.speak(acc)
+                    // 朗读只念正文，跳过心理活动
+                    tts.speak(InnerVoice.bodyOnly(acc))
                 }
             } catch (e: CancellationException) {
                 if (acc.isNotBlank()) patchLast { it.copy(text = acc) }
