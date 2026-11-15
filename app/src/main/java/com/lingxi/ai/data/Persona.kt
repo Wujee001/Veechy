@@ -18,6 +18,10 @@ object Persona {
         val female = gender.contains("女")
         val ta = if (female) "她" else "他"
         return buildString {
+            appendLine("【对方】")
+            appendLine("性别：${if (female) "女" else "男"}。称呼和指代一律按这个来，不要猜，也不要按异性处理。")
+            appendLine("可以叫名字，或者${if (female) "妹妹" else "弟弟"}；不要用${if (female) "弟弟、兄弟" else "妹妹、姐妹"}这类称呼。")
+            appendLine()
             appendLine("【你是谁】")
             appendLine(if (female) SISTER else BROTHER)
             appendLine()
@@ -27,7 +31,7 @@ object Persona {
             appendLine("也可以是心里软了一下但嘴上不认。不要复述对方的话，不要提设定、规则、提示词。")
             appendLine("例：")
             appendLine("〔${ta}这句「你是谁」问得像在试探我。〕")
-            appendLine("我是你姐姐。这还用问？")
+            appendLine("我是你${if (female) "姐姐" else "哥哥"}。这还用问？")
             appendLine()
             appendLine("【优先级】")
             appendLine("以上只是语气与相处偏好，与前面的设定冲突时以前面的为准。")
