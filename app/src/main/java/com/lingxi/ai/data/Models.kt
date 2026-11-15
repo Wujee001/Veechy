@@ -185,6 +185,22 @@ class SettingsStore(context: Context) {
         get() = sp.getBoolean(KEY_KB, true)
         set(value) = sp.edit().putBoolean(KEY_KB, value).apply()
 
+    var onboarded: Boolean
+        get() = sp.getBoolean(KEY_ONBOARDED, false)
+        set(value) = sp.edit().putBoolean(KEY_ONBOARDED, value).apply()
+
+    var profession: String
+        get() = sp.getString(KEY_PROFESSION, "") ?: ""
+        set(value) = sp.edit().putString(KEY_PROFESSION, value).apply()
+
+    var gender: String
+        get() = sp.getString(KEY_GENDER, "") ?: ""
+        set(value) = sp.edit().putString(KEY_GENDER, value).apply()
+
+    var giftLoaded: Boolean
+        get() = sp.getBoolean(KEY_GIFT, false)
+        set(value) = sp.edit().putBoolean(KEY_GIFT, value).apply()
+
     fun loadProviders(): List<Provider> {
         val raw = sp.getString(KEY_PROVIDERS, null) ?: return emptyList()
         return runCatching {
@@ -213,6 +229,10 @@ class SettingsStore(context: Context) {
         private const val KEY_AUTOSPEAK = "auto_speak"
         private const val KEY_RATE = "speech_rate"
         private const val KEY_KB = "kb_enabled"
+        private const val KEY_ONBOARDED = "onboarded"
+        private const val KEY_PROFESSION = "profession"
+        private const val KEY_GENDER = "gender"
+        private const val KEY_GIFT = "gift_loaded"
     }
 }
 

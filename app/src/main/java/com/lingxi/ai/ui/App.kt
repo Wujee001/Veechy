@@ -52,6 +52,9 @@ fun App(vm: MainViewModel = viewModel()) {
 
     GradientBackground {
         Box(Modifier.fillMaxSize()) {
+        if (!vm.onboarded) {
+            OnboardingScreen(vm)
+        } else {
         when (screen) {
             Screen.MAIN -> Scaffold(
                 modifier = Modifier.imePadding(),
@@ -87,6 +90,7 @@ fun App(vm: MainViewModel = viewModel()) {
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 16.dp, vertical = 96.dp)
             )
+        }
         }
     }
 }

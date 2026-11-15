@@ -11,6 +11,7 @@ import com.lingxi.ai.audio.TtsPlayer
 import com.lingxi.ai.data.ChatMessage
 import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
+import com.lingxi.ai.data.Persona
 import com.lingxi.ai.data.Provider
 import com.lingxi.ai.data.SettingsStore
 import com.lingxi.ai.media.MediaUtil
@@ -45,6 +46,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var kbEnabled by mutableStateOf(settings.kbEnabled)
         private set
     var bookPreview by mutableStateOf<IsbnLookup.BookInfo?>(null)
+        private set
+
+    var onboarded by mutableStateOf(settings.onboarded)
         private set
 
     var providers by mutableStateOf(settings.loadProviders())
@@ -95,6 +99,46 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             createConversation()
         } else {
             current = list.first()
+        }
+        if (settings.onboarded) loadGift()
+    }
+
+    // ------------------------------------------------------------ 首启引导
+
+    fun completeOnboarding(profession: String, gender: String) {
+        val p = profession.trim()
+        val g = gender.trim()
+        settings.profession = p
+        settings.gender = g
+        val prompt = Persona.defaultSystemPrompt(p)
+        settings.systemPrompt = prompt
+        systemPrompt = prompt
+        settings.onboarded = true
+        onboarded = true
+        loadGift()
+    }
+
+    /** 内置见面礼：四六级写作高级提分词汇。只装一次。 */
+    private fun loadGift() {
+        if (settings.giftLoaded) return
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            kbBusy = "正在准备见面礼…"
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val parsed = DocumentParser.parseAsset(ctx, "gift_cet4_writing.pdf")
+                    kb.add(parsed.name, parsed.kind, "内置赠礼", parsed.text)
+                    parsed
+                }
+            }
+            kbBusy = null
+            result.onSuccess {
+                kbDocs = kb.docs
+                settings.giftLoaded = true
+                status = "已经放好见面礼：${it.name}"
+            }.onFailure {
+                status = "见面礼导入失败：${it.message}"
+            }
         }
     }
 
@@ -335,6 +379,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         kbHits: List<KbHit> = emptyList()
     ): JSONArray {
         val arr = JSONArray()
+        // 隐藏人设：只在请求里注入，界面上不暴露
+        arr.put(JSONObject().put("role", "system").put("content", Persona.hidden(settings.gender)))
         if (system.isNotBlank()) {
             arr.put(JSONObject().put("role", "system").put("content", system))
         }

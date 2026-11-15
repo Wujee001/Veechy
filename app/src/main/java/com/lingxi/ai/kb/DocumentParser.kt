@@ -6,6 +6,7 @@ import android.provider.OpenableColumns
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import java.io.InputStream
 import java.util.zip.ZipInputStream
 
 data class ParsedDoc(val name: String, val kind: String, val text: String)
@@ -23,26 +24,53 @@ object DocumentParser {
         val name = queryName(context, uri) ?: "未命名文档"
         val ext = name.substringAfterLast('.', "").lowercase()
 
-        val text = when (ext) {
-            "pdf" -> readPdf(context, uri)
-            "docx", "docm" -> readDocx(context, uri)
-            "pptx", "pptm" -> readPptx(context, uri)
-            "txt", "md", "markdown", "csv", "json", "log" -> readPlain(context, uri)
-            else -> {
-                // 无法从扩展名判断时按内容嗅探
-                val zip = readPlain(context, uri, limit = 4)
-                when {
-                    zip.startsWith("PK") -> readOfficeBySniff(context, uri)
-                    else -> readPlain(context, uri)
-                }
-            }
-        }.let(::cleanup)
+        val text = context.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "无法打开文件" }
+            readByExt(context, ext, input) { context.contentResolver.openInputStream(uri) }
+        }
 
         if (text.isBlank()) {
             throw IllegalStateException("没有提取到文本，可能是扫描版或加密文件")
         }
         return ParsedDoc(name, ext.ifBlank { "txt" }, text)
     }
+
+    /** 读取 APK 内置 assets 里的文档（见面礼）。 */
+    fun parseAsset(context: Context, assetName: String): ParsedDoc {
+        val ext = assetName.substringAfterLast('.', "txt").lowercase()
+        val text = context.assets.open(assetName).use { input ->
+            readByExt(context, ext, input) { context.assets.open(assetName) }
+        }
+        if (text.isBlank()) throw IllegalStateException("内置文档没有提取到文本")
+        return ParsedDoc(assetName.substringBeforeLast('.', assetName), ext, text)
+    }
+
+    private fun readByExt(
+        context: Context,
+        ext: String,
+        input: InputStream,
+        reopen: () -> InputStream?
+    ): String = cleanup(
+        when (ext) {
+            "pdf" -> readPdfStream(context, input)
+            "docx", "docm" -> readDocxStream(input)
+            "pptx", "pptm" -> readPptxStream(input)
+            "txt", "md", "markdown", "csv", "json", "log" -> readTextStream(input)
+            else -> {
+                // 扩展名不可靠时按内容嗅探
+                val head = readTextStream(input, limit = 4)
+                if (head.startsWith("PK")) {
+                    reopen()?.use { s ->
+                        runCatching { readDocxStream(s) }.getOrDefault("").ifBlank {
+                            reopen()?.use { s2 -> readPptxStream(s2) } ?: ""
+                        }
+                    } ?: ""
+                } else {
+                    reopen()?.use { readTextStream(it) } ?: ""
+                }
+            }
+        }
+    )
 
     // ---------------------------------------------------------------- PDF
 
@@ -57,23 +85,32 @@ object DocumentParser {
         }
     }
 
-    private fun readPdf(context: Context, uri: Uri): String {
+    private fun readPdfStream(context: Context, input: InputStream): String {
         ensurePdf(context)
-        context.contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "无法打开文件" }
-            PDDocument.load(input).use { doc ->
-                val stripper = PDFTextStripper()
-                stripper.sortByPosition = true
-                return stripper.getText(doc)
-            }
+        PDDocument.load(input).use { doc ->
+            val stripper = PDFTextStripper()
+            stripper.sortByPosition = true
+            return stripper.getText(doc)
         }
     }
 
     // ---------------------------------------------------------------- DOCX
 
-    private fun readDocx(context: Context, uri: Uri): String {
-        val xml = readZipEntry(context, uri, "word/document.xml") ?: return ""
-        val spaced = xml
+    private fun readDocxStream(input: InputStream): String {
+        var xml: String? = null
+        ZipInputStream(input).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (entry.name == "word/document.xml") {
+                    xml = zip.readBytes().toString(Charsets.UTF_8)
+                    break
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        val raw = xml ?: return ""
+        val spaced = raw
             .replace("</w:p>", "\n")
             .replace("<w:br/>", "\n")
             .replace("<w:tab/>", "\t")
@@ -83,25 +120,21 @@ object DocumentParser {
 
     // ---------------------------------------------------------------- PPTX
 
-    private fun readPptx(context: Context, uri: Uri): String {
+    private fun readPptxStream(input: InputStream): String {
         val slides = ArrayList<Pair<Int, String>>()
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            ZipInputStream(input).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    val n = entry.name
-                    if (n.startsWith("ppt/slides/slide") && n.endsWith(".xml")) {
-                        val index = n.removePrefix("ppt/slides/slide").removeSuffix(".xml").toIntOrNull() ?: 0
-                        val xml = zip.readBytes().toString(Charsets.UTF_8)
-                        slides.add(index to extractAText(xml))
-                    } else if (n.startsWith("ppt/notesSlides/notesSlide") && n.endsWith(".xml")) {
-                        val index = n.removePrefix("ppt/notesSlides/notesSlide").removeSuffix(".xml").toIntOrNull() ?: 0
-                        val xml = zip.readBytes().toString(Charsets.UTF_8)
-                        slides.add(index to extractAText(xml))
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
+        ZipInputStream(input).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                val n = entry.name
+                if (n.startsWith("ppt/slides/slide") && n.endsWith(".xml")) {
+                    val index = n.removePrefix("ppt/slides/slide").removeSuffix(".xml").toIntOrNull() ?: 0
+                    slides.add(index to extractAText(zip.readBytes().toString(Charsets.UTF_8)))
+                } else if (n.startsWith("ppt/notesSlides/notesSlide") && n.endsWith(".xml")) {
+                    val index = n.removePrefix("ppt/notesSlides/notesSlide").removeSuffix(".xml").toIntOrNull() ?: 0
+                    slides.add(index to extractAText(zip.readBytes().toString(Charsets.UTF_8)))
                 }
+                zip.closeEntry()
+                entry = zip.nextEntry
             }
         }
         return slides.sortedBy { it.first }
@@ -110,36 +143,17 @@ object DocumentParser {
 
     private fun extractAText(xml: String): String {
         val sb = StringBuilder()
-        val regex = Regex("<a:t>(.*?)</a:t>", RegexOption.DOT_MATCHES_ALL)
-        regex.findAll(xml).forEach { sb.append(it.groupValues[1]).append('\n') }
+        Regex("<a:t>(.*?)</a:t>", RegexOption.DOT_MATCHES_ALL).findAll(xml).forEach {
+            sb.append(it.groupValues[1]).append('\n')
+        }
         return unescape(sb.toString())
     }
 
     // ---------------------------------------------------------------- 通用
 
-    private fun readOfficeBySniff(context: Context, uri: Uri): String =
-        readDocx(context, uri).ifBlank { readPptx(context, uri) }
-
-    private fun readPlain(context: Context, uri: Uri, limit: Int = Int.MAX_VALUE): String =
-        context.contentResolver.openInputStream(uri)?.use {
-            val bytes = it.readBytes()
-            String(bytes, 0, minOf(bytes.size, limit), Charsets.UTF_8)
-        } ?: ""
-
-    private fun readZipEntry(context: Context, uri: Uri, entryName: String): String? {
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            ZipInputStream(input).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (entry.name == entryName) {
-                        return zip.readBytes().toString(Charsets.UTF_8)
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
-                }
-            }
-        }
-        return null
+    private fun readTextStream(input: InputStream, limit: Int = Int.MAX_VALUE): String {
+        val bytes = input.readBytes()
+        return String(bytes, 0, minOf(bytes.size, limit), Charsets.UTF_8)
     }
 
     private fun stripXml(s: String): String = unescape(s.replace(Regex("<[^>]+>"), ""))

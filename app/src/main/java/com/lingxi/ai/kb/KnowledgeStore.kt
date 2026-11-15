@@ -148,6 +148,8 @@ class KnowledgeStore(context: Context) {
     private fun normalize(raw: String): String = raw
         .replace("\r\n", "\n")
         .replace(' ', ' ')
+        // PDF 抽取常把中文逐字拆开（"在 大 学"），去掉中文字符之间的空格
+        .replace(Regex("(?<=[\u4e00-\u9fa5])\\s+(?=[\u4e00-\u9fa5])"), "")
         .replace(Regex("[ \\t]{2,}"), " ")
         .replace(Regex("\\n{3,}"), "\n\n")
         .trim()
