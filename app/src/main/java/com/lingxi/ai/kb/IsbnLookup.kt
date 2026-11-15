@@ -25,7 +25,8 @@ object IsbnLookup {
         val pages: String,
         val subjects: String,
         val description: String,
-        val link: String
+        val link: String,
+        val origin: String = "online"
     ) {
         fun toKbText(): String = buildString {
             appendLine("书名：$title")
@@ -44,10 +45,18 @@ object IsbnLookup {
         }
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .callTimeout(9, TimeUnit.SECONDS)
+    // 国内 googleapis 基本不可达，快速失败即可，不拖住整体查询
+    private val googleClient = OkHttpClient.Builder()
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(4, TimeUnit.SECONDS)
+        .callTimeout(5, TimeUnit.SECONDS)
+        .build()
+
+    // openlibrary 一般能通但慢，给足时间
+    private val openClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(18, TimeUnit.SECONDS)
         .build()
 
     private fun normalize(raw: String): String =
@@ -80,7 +89,7 @@ object IsbnLookup {
             .url("https://www.googleapis.com/books/v1/volumes?q=isbn:$isbn")
             .get()
             .build()
-        client.newCall(req).execute().use { resp ->
+        googleClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) return null
             val body = resp.body?.string() ?: return null
             val json = JSONObject(body)
@@ -116,7 +125,7 @@ object IsbnLookup {
             .url("https://openlibrary.org/api/books?bibkeys=ISBN:$isbn&format=json&jscmd=data")
             .get()
             .build()
-        client.newCall(req).execute().use { resp ->
+        openClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) return null
             val body = resp.body?.string() ?: return null
             val root = JSONObject(body)

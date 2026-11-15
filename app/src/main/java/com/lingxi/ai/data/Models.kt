@@ -51,6 +51,7 @@ data class Provider(
     val baseUrl: String,
     val apiKey: String,
     val enabled: Boolean = true,
+    val search: Boolean = false,
     val models: List<ModelInfo> = emptyList(),
     val lastSync: Long = 0L
 ) {
@@ -60,6 +61,7 @@ data class Provider(
         put("baseUrl", baseUrl)
         put("apiKey", apiKey)
         put("enabled", enabled)
+        put("search", search)
         put("lastSync", lastSync)
         put("models", JSONArray().also { a -> models.forEach { a.put(it.toJson()) } })
     }
@@ -75,6 +77,7 @@ data class Provider(
                 baseUrl = o.optString("baseUrl"),
                 apiKey = o.optString("apiKey"),
                 enabled = o.optBoolean("enabled", true),
+                search = o.optBoolean("search", false),
                 models = list,
                 lastSync = o.optLong("lastSync")
             )

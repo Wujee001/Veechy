@@ -293,7 +293,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     onReasoning = { r ->
                         reason += r
                         patchLast { it.copy(reasoning = reason) }
-                    }
+                    },
+                    enableSearch = provider.search
                 )
                 if (acc.isBlank()) {
                     patchLast { it.copy(text = "（模型没有返回内容）") }
@@ -415,17 +416,86 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun lookupIsbn(raw: String) {
-        if (raw.isBlank()) {
-            status = "请输入 ISBN"
+        val isbn = raw.filter { it.isDigit() || it == 'X' || it == 'x' }.uppercase()
+        if (isbn.length != 10 && isbn.length != 13) {
+            status = "ISBN 应为 10 位或 13 位，你输入的是 ${isbn.length} 位"
             return
         }
         viewModelScope.launch {
+            // 1. 先试公开书目接口
             kbBusy = "查询书目…"
-            val result = runCatching { IsbnLookup.lookup(raw) }
+            val online = runCatching { IsbnLookup.lookup(isbn) }
+            if (online.isSuccess) {
+                kbBusy = null
+                bookPreview = online.getOrNull()
+                return@launch
+            }
+
+            // 2. 在线源不可用 → 交给模型（配合 enable_search 就是联网检索）
+            val provider = activeProvider
+            val model = activeModelId ?: provider?.models?.firstOrNull()?.id
+            if (provider == null || model.isNullOrBlank()) {
+                kbBusy = null
+                status = "在线书目源不可用（${online.exceptionOrNull()?.message}），且未配置模型"
+                return@launch
+            }
+
+            kbBusy = if (provider.search) "在线源不可用，改用模型联网检索…" else "在线源不可用，改用模型推断…"
+            val inferred = runCatching { modelLookup(provider, model, isbn) }
             kbBusy = null
-            result.onSuccess { bookPreview = it }
+            inferred.onSuccess { bookPreview = it }
                 .onFailure { status = "查询失败：${it.message}" }
         }
+    }
+
+    /** 让当前模型按固定 JSON 结构给出书目信息。 */
+    private suspend fun modelLookup(
+        provider: Provider,
+        model: String,
+        isbn: String
+    ): IsbnLookup.BookInfo {
+        val messages = JSONArray().apply {
+            put(
+                JSONObject().put("role", "system").put(
+                    "content",
+                    "你是图书信息助手。根据 ISBN 输出这本书的信息，只输出一个 JSON 对象，" +
+                        "不要解释、不要代码块标记。字段：title、authors、publisher、year、" +
+                        "pages、subjects、description。不确定的字段用空字符串，禁止编造。"
+                )
+            )
+            put(JSONObject().put("role", "user").put("content", "ISBN: $isbn"))
+        }
+
+        val raw = api.streamChat(
+            base = provider.baseUrl,
+            key = provider.apiKey,
+            model = model,
+            messages = messages,
+            temperature = 0.2,
+            onDelta = {},
+            enableSearch = provider.search
+        )
+
+        val body = raw.substringAfter('{', "").substringBeforeLast('}', "")
+        if (body.isBlank()) throw IllegalStateException("模型没有返回可解析的内容")
+        val o = runCatching { JSONObject("{$body}") }
+            .getOrElse { throw IllegalStateException("模型返回的不是 JSON") }
+
+        val title = o.optString("title").trim()
+        if (title.isBlank()) throw IllegalStateException("模型也查不到这本书")
+
+        return IsbnLookup.BookInfo(
+            isbn = isbn,
+            title = title,
+            authors = o.optString("authors"),
+            publisher = o.optString("publisher"),
+            year = o.optString("year"),
+            pages = o.optString("pages"),
+            subjects = o.optString("subjects"),
+            description = o.optString("description"),
+            link = "",
+            origin = "model"
+        )
     }
 
     fun saveBookToKb(info: IsbnLookup.BookInfo) {

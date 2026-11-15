@@ -195,6 +195,12 @@ fun KnowledgeScreen(vm: MainViewModel, onBack: () -> Unit) {
                 }
 
                 vm.bookPreview?.let { b ->
+                    var eTitle by remember(b) { mutableStateOf(b.title) }
+                    var eAuthors by remember(b) { mutableStateOf(b.authors) }
+                    var ePublisher by remember(b) { mutableStateOf(b.publisher) }
+                    var eYear by remember(b) { mutableStateOf(b.year) }
+                    var eDesc by remember(b) { mutableStateOf(b.description) }
+
                     Spacer(Modifier.height(12.dp))
                     Box(
                         Modifier
@@ -204,30 +210,49 @@ fun KnowledgeScreen(vm: MainViewModel, onBack: () -> Unit) {
                             .padding(12.dp)
                     ) {
                         Column {
-                            Text(b.title, style = MaterialTheme.typography.titleSmall, color = Ink)
-                            Spacer(Modifier.height(3.dp))
-                            val meta = listOf(b.authors, b.publisher, b.year).filter { it.isNotBlank() }
-                            if (meta.isNotEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Badge(
+                                    if (b.origin == "model") "模型推断" else "在线书目",
+                                    if (b.origin == "model") Color(0xFFE5484D) else Blue
+                                )
+                                Spacer(Modifier.width(6.dp))
                                 Text(
-                                    meta.joinToString(" · "),
+                                    if (b.origin == "model") "可能有误，请核对后再入库" else "来自公开书目接口",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = InkSoft
                                 )
                             }
-                            if (b.description.isNotBlank()) {
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    b.description.take(240) + if (b.description.length > 240) "…" else "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = InkSoft,
-                                    maxLines = 6,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            Spacer(Modifier.height(8.dp))
+
+                            KbField("书名", eTitle) { eTitle = it }
+                            Spacer(Modifier.height(6.dp))
+                            KbField("作者", eAuthors) { eAuthors = it }
+                            Spacer(Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Box(Modifier.weight(1f)) {
+                                    KbField("出版社", ePublisher) { ePublisher = it }
+                                }
+                                Box(Modifier.weight(0.6f)) {
+                                    KbField("出版年", eYear) { eYear = it }
+                                }
                             }
+                            Spacer(Modifier.height(6.dp))
+                            KbField("简介", eDesc, singleLine = false) { eDesc = it }
+
                             Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
-                                    onClick = { vm.saveBookToKb(b) },
+                                    onClick = {
+                                        vm.saveBookToKb(
+                                            b.copy(
+                                                title = eTitle.trim(),
+                                                authors = eAuthors.trim(),
+                                                publisher = ePublisher.trim(),
+                                                year = eYear.trim(),
+                                                description = eDesc.trim()
+                                            )
+                                        )
+                                    },
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Purple,
@@ -298,6 +323,33 @@ fun KnowledgeScreen(vm: MainViewModel, onBack: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun KbField(
+    label: String,
+    value: String,
+    singleLine: Boolean = true,
+    onChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = singleLine,
+        maxLines = if (singleLine) 1 else 5,
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        textStyle = MaterialTheme.typography.bodySmall,
+        shape = RoundedCornerShape(10.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Purple.copy(alpha = 0.55f),
+            unfocusedBorderColor = Color(0xFFEDEAF7),
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedTextColor = Ink,
+            unfocusedTextColor = Ink
+        )
+    )
 }
 
 private fun formatDate(ts: Long): String =

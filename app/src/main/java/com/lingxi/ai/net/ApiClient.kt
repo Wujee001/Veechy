@@ -88,13 +88,16 @@ class ApiClient {
         messages: JSONArray,
         temperature: Double,
         onDelta: (String) -> Unit,
-        onReasoning: (String) -> Unit = {}
+        onReasoning: (String) -> Unit = {},
+        enableSearch: Boolean = false
     ): String = withContext(Dispatchers.IO) {
         val payload = JSONObject().apply {
             put("model", model)
             put("messages", messages)
             put("stream", true)
             put("temperature", temperature)
+            // 阿里云百炼 / 通义千问 兼容模式：开启后由服务端联网检索
+            if (enableSearch) put("enable_search", true)
         }
 
         val req = Request.Builder()

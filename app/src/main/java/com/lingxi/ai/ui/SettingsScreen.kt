@@ -238,7 +238,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenKnowledge: () ->
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.2.0", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.2.1", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -352,6 +352,33 @@ private fun ProviderCard(vm: MainViewModel, provider: Provider, onDelete: () -> 
                 shape = RoundedCornerShape(10.dp),
                 colors = fieldColors()
             )
+
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFF8F7FD))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("联网搜索", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                    Text(
+                        "请求里带 enable_search=true，由服务端联网检索（阿里云百炼 / 通义千问支持）",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = InkSoft
+                    )
+                }
+                Switch(
+                    checked = provider.search,
+                    onCheckedChange = { vm.updateProvider(provider.copy(search = it)) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Purple
+                    )
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
