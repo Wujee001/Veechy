@@ -174,7 +174,7 @@ private fun ChatTopBar(
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(vm.current?.title ?: "灵犀", style = MaterialTheme.typography.titleMedium, color = Ink, maxLines = 1)
+            Text(vm.current?.title ?: "Wujee's AI", style = MaterialTheme.typography.titleMedium, color = Ink, maxLines = 1)
             Box {
                 Row(
                     Modifier

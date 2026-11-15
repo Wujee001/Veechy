@@ -1,6 +1,7 @@
 package com.lingxi.ai
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,10 +14,17 @@ import com.lingxi.ai.data.Conversation
 import com.lingxi.ai.data.Provider
 import com.lingxi.ai.data.SettingsStore
 import com.lingxi.ai.media.MediaUtil
+import com.lingxi.ai.kb.DocumentParser
+import com.lingxi.ai.kb.IsbnLookup
+import com.lingxi.ai.kb.KbDoc
+import com.lingxi.ai.kb.KbHit
+import com.lingxi.ai.kb.KnowledgeStore
 import com.lingxi.ai.net.ApiClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -28,6 +36,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val api = ApiClient()
 
     val tts = TtsPlayer(app)
+    val kb = KnowledgeStore(app)
+
+    var kbDocs by mutableStateOf(kb.docs)
+        private set
+    var kbBusy by mutableStateOf<String?>(null)
+        private set
+    var kbEnabled by mutableStateOf(settings.kbEnabled)
+        private set
+    var bookPreview by mutableStateOf<IsbnLookup.BookInfo?>(null)
+        private set
 
     var providers by mutableStateOf(settings.loadProviders())
         private set
@@ -244,17 +262,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
         push(withUser)
 
-        val payload = buildPayload(
-            history = convo.messages + userMsg,
-            system = systemPrompt,
-            turns = contextTurns
-        )
+        val history = convo.messages + userMsg
 
         streaming = true
         job = viewModelScope.launch {
             var acc = ""
             var reason = ""
             try {
+                val hits = if (kbEnabled) {
+                    withContext(Dispatchers.IO) { kb.search(text, 3) }
+                } else {
+                    emptyList()
+                }
+                val payload = buildPayload(
+                    history = history,
+                    system = systemPrompt,
+                    turns = contextTurns,
+                    kbHits = hits
+                )
                 api.streamChat(
                     base = provider.baseUrl,
                     key = provider.apiKey,
@@ -302,10 +327,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         current = c.copy(messages = list, updatedAt = System.currentTimeMillis())
     }
 
-    private fun buildPayload(history: List<ChatMessage>, system: String, turns: Int): JSONArray {
+    private fun buildPayload(
+        history: List<ChatMessage>,
+        system: String,
+        turns: Int,
+        kbHits: List<KbHit> = emptyList()
+    ): JSONArray {
         val arr = JSONArray()
         if (system.isNotBlank()) {
             arr.put(JSONObject().put("role", "system").put("content", system))
+        }
+        if (kbHits.isNotEmpty()) {
+            val ctx = kbHits.joinToString("\n\n") { "[资料 · ${it.docName}]\n${it.text}" }
+            arr.put(
+                JSONObject().put("role", "system").put(
+                    "content",
+                    "以下是从用户本地知识库检索到的资料片段。回答时优先依据这些内容；" +
+                        "资料不足时明确说明，不要编造。引用时注明来源文件名。\n\n$ctx"
+                )
+            )
         }
         val recent = if (turns <= 0) history else history.takeLast(turns * 2)
         for (m in recent) {
@@ -337,6 +377,72 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             arr.put(obj)
         }
         return arr
+    }
+
+    // ------------------------------------------------------------ 知识库
+
+    fun updateKbEnabled(value: Boolean) {
+        kbEnabled = value
+        settings.kbEnabled = value
+    }
+
+    fun importDocument(uri: Uri) {
+        if (kbBusy != null) return
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            kbBusy = "解析中…"
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val parsed = DocumentParser.parse(ctx, uri)
+                    kb.add(parsed.name, parsed.kind, "本地文件", parsed.text)
+                    parsed
+                }
+            }
+            kbBusy = null
+            result.onSuccess { d ->
+                kbDocs = kb.docs
+                status = "已存入知识库：${d.name}（${d.text.length} 字）"
+            }.onFailure {
+                status = "导入失败：${it.message}"
+            }
+        }
+    }
+
+    fun removeKnowledge(id: String) {
+        kb.remove(id)
+        kbDocs = kb.docs
+        status = "已从知识库删除"
+    }
+
+    fun lookupIsbn(raw: String) {
+        if (raw.isBlank()) {
+            status = "请输入 ISBN"
+            return
+        }
+        viewModelScope.launch {
+            kbBusy = "查询书目…"
+            val result = runCatching { IsbnLookup.lookup(raw) }
+            kbBusy = null
+            result.onSuccess { bookPreview = it }
+                .onFailure { status = "查询失败：${it.message}" }
+        }
+    }
+
+    fun saveBookToKb(info: IsbnLookup.BookInfo) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { kb.add(info.title, "book", "ISBN ${info.isbn}", info.toKbText()) }
+            }
+            result.onSuccess {
+                kbDocs = kb.docs
+                bookPreview = null
+                status = "已存入知识库：${it.name}"
+            }.onFailure { status = "保存失败：${it.message}" }
+        }
+    }
+
+    fun clearBookPreview() {
+        bookPreview = null
     }
 
     // ------------------------------------------------------------ 设置写入

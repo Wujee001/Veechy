@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LingXi"
+rootProject.name = "WujeesAI"
 include(":app")

@@ -22,7 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -81,7 +83,7 @@ private val Presets = listOf(
 )
 
 @Composable
-fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenKnowledge: () -> Unit = {}) {
     var showAdd by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Provider?>(null) }
 
@@ -203,13 +205,38 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
             }
 
             Spacer(Modifier.height(20.dp))
+            SectionTitle("知识库")
+            SoftCard {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(onClick = onOpenKnowledge)
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.MenuBook, null, tint = Purple, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("管理知识库", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "${vm.kbDocs.size} 份资料 · 长期保存在本机",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = InkSoft, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
             SectionTitle("关于")
             SoftCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("灵犀 1.0.0", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.1.0", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,

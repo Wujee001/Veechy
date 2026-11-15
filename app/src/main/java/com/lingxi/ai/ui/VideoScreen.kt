@@ -69,8 +69,8 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
 
     val speech = remember { SpeechInput(context) }
     val camera = remember { CameraController(context, lifecycleOwner) }
-    var useFront by remember { mutableStateOf(true) }
-    var enabled by remember { mutableStateOf(false) }
+    var useFront by remember { mutableStateOf(false) }
+    var enabled by remember { mutableStateOf(true) }
     var capturing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {

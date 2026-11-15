@@ -33,10 +33,12 @@ import com.lingxi.ai.ui.theme.InkSoft
 import com.lingxi.ai.ui.theme.Purple
 import com.lingxi.ai.ui.theme.PurpleSoft
 
+private enum class Screen { MAIN, SETTINGS, KNOWLEDGE }
+
 @Composable
 fun App(vm: MainViewModel = viewModel()) {
     var tab by remember { mutableStateOf(0) }
-    var showSettings by remember { mutableStateOf(false) }
+    var screen by remember { mutableStateOf(Screen.MAIN) }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(vm.status) {
@@ -48,10 +50,8 @@ fun App(vm: MainViewModel = viewModel()) {
     }
 
     GradientBackground {
-        if (showSettings) {
-            SettingsScreen(vm, onBack = { showSettings = false })
-        } else {
-            Scaffold(
+        when (screen) {
+            Screen.MAIN -> Scaffold(
                 modifier = Modifier.imePadding(),
                 containerColor = Color.Transparent,
                 snackbarHost = { SnackbarHost(snackbar) },
@@ -59,11 +59,23 @@ fun App(vm: MainViewModel = viewModel()) {
             ) { inner ->
                 Box(Modifier.fillMaxSize().padding(inner)) {
                     when (tab) {
-                        0 -> ChatScreen(vm, onOpenSettings = { showSettings = true })
-                        1 -> VoiceScreen(vm, onOpenSettings = { showSettings = true })
-                        else -> VideoScreen(vm, onOpenSettings = { showSettings = true })
+                        0 -> ChatScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
+                        1 -> VoiceScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
+                        else -> VideoScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
                     }
                 }
+            }
+
+            Screen.SETTINGS -> SwipeBackContainer(onBack = { screen = Screen.MAIN }) {
+                SettingsScreen(
+                    vm = vm,
+                    onBack = { screen = Screen.MAIN },
+                    onOpenKnowledge = { screen = Screen.KNOWLEDGE }
+                )
+            }
+
+            Screen.KNOWLEDGE -> SwipeBackContainer(onBack = { screen = Screen.SETTINGS }) {
+                KnowledgeScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
             }
         }
     }

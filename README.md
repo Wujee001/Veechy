@@ -1,7 +1,7 @@
-# 灵犀（LingXi）
+# Wujee's AI
 
 本地运行的 Android AI 助手。自填 API，直连任意 **OpenAI 兼容** 服务（七牛云、千问兼容模式、DeepSeek、OpenAI、Ollama / LM Studio 等）。
-文字、语音、视觉三种对话模式，界面为紫蓝白浅色渐变。
+文字、语音、视觉三种对话模式，带本地知识库，界面为紫蓝白浅色渐变。
 
 ## 功能
 
@@ -9,8 +9,11 @@
 |---|---|
 | 对话 | 流式输出、多轮上下文、图片输入、深度思考内容（reasoning_content）展示、历史会话本地保存 |
 | 语音 | 系统 ASR 连续识别 → 自动发送 → 系统 TTS 自动朗读，含音量动效球 |
-| 视觉 | CameraX 前置预览；说完一句话自动抓帧，连同语音文本一起发给多模态模型 |
-| 设置 | 多供应商管理、API Key 掩码显示、连通性检测、一键同步模型列表、温度 / 上下文轮数 / 语速 |
+| 视觉 | CameraX 后置预览（可切前置），默认开启语音；说完一句自动抓帧连同语音文本发给多模态模型 |
+| 知识库 | 上传 PDF / DOCX / PPTX / TXT，提取全文后分块存在本机，提问时自动检索并注入上下文；可随时删除 |
+| 书目 | 输入 ISBN 查询公开书目信息（书名、作者、出版社、简介、分类）并存入知识库 |
+| 设置 | 多供应商管理、API Key 掩码、连通性检测、模型同步、温度 / 上下文轮数 / 语速 |
+| 交互 | 左侧边缘右滑返回上一页 |
 
 ## 构建
 
@@ -89,7 +92,10 @@ app/src/main/java/com/lingxi/ai/
 ├── audio/TtsPlayer.kt       语音合成（自动清洗 Markdown）
 ├── camera/CameraController.kt  CameraX 预览 + 抓帧
 ├── media/MediaUtil.kt       图片压缩 / 降采样 / base64
-└── ui/                      界面（Chat / Voice / Video / Settings）
+├── kb/DocumentParser.kt     PDF / DOCX / PPTX / TXT 文本提取
+├── kb/KnowledgeStore.kt     分块、索引、bigram 检索
+├── kb/IsbnLookup.kt         ISBN → 书目元数据
+└── ui/                      界面（Chat / Voice / Video / Settings / Knowledge）
 ```
 
 ## 已知边界
@@ -98,6 +104,9 @@ app/src/main/java/com/lingxi/ai/
 - **视觉模式是按轮抓帧**，不是逐帧视频流。想改成实时连续帧，改 `VideoScreen.kt` 里的触发逻辑为定时器 + `camera.snap()` 即可，但会显著增加 token 消耗。
 - **API Key 明文存本机** SharedPreferences，仅适用于个人设备。
 - 图片以 base64 内联发送，取决于所选模型是否支持 `image_url`（模型列表里带「图」标记的才保证支持）。
+- **知识库只做本地检索（字符 bigram 相似度）**，没有 embedding 模型，长文档召回率不如向量检索，但零依赖、零联网。
+- **ISBN 只查询公开书目元数据**（Google Books / Open Library），不提供、不抓取书籍正文。要基于某本书问答，请上传你自己拥有的电子版。
+- 扫描版 PDF 没有文字层，提取会得到空内容，需要先 OCR 再导入。
 - 应用开启了 `usesCleartextTraffic`，以便连接局域网内的 Ollama / LM Studio（http）。不需要可删掉该属性。
 
 ## 改配色

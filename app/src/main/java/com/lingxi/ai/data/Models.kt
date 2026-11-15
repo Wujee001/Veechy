@@ -178,6 +178,10 @@ class SettingsStore(context: Context) {
         get() = sp.getFloat(KEY_RATE, 1.0f)
         set(value) = sp.edit().putFloat(KEY_RATE, value).apply()
 
+    var kbEnabled: Boolean
+        get() = sp.getBoolean(KEY_KB, true)
+        set(value) = sp.edit().putBoolean(KEY_KB, value).apply()
+
     fun loadProviders(): List<Provider> {
         val raw = sp.getString(KEY_PROVIDERS, null) ?: return emptyList()
         return runCatching {
@@ -205,6 +209,7 @@ class SettingsStore(context: Context) {
         private const val KEY_TURNS = "context_turns"
         private const val KEY_AUTOSPEAK = "auto_speak"
         private const val KEY_RATE = "speech_rate"
+        private const val KEY_KB = "kb_enabled"
     }
 }
 
