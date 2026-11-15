@@ -375,11 +375,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         kbHits: List<KbHit> = emptyList()
     ): JSONArray {
         val arr = JSONArray()
-        // 隐藏人设：只在请求里注入，界面上不暴露
-        arr.put(JSONObject().put("role", "system").put("content", Persona.hidden(settings.gender)))
+        // 用户自己在设置里写的提示词优先
         if (system.isNotBlank()) {
             arr.put(JSONObject().put("role", "system").put("content", system))
         }
+        // 隐藏人设：只在请求里注入，界面上不暴露
+        arr.put(JSONObject().put("role", "system").put("content", Persona.block(settings.gender)))
         if (kbHits.isNotEmpty()) {
             val ctx = kbHits.joinToString("\n\n") { "[资料 · ${it.docName}]\n${it.text}" }
             arr.put(
