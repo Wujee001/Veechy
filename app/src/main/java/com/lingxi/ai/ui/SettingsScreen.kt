@@ -145,7 +145,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = vm.systemPrompt,
-                    onValueChange = vm::setSystemPrompt,
+                    onValueChange = vm::updateSystemPrompt,
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 5,
@@ -160,7 +160,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     range = 0.0..1.5,
                     steps = 14,
                     display = String.format("%.1f", vm.temperature)
-                ) { vm.setTemperature(it.toFloat()) }
+                ) { vm.updateTemperature(it.toFloat()) }
 
                 SliderRow(
                     label = "携带历史轮数",
@@ -168,7 +168,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     range = 0.0..30.0,
                     steps = 29,
                     display = "${vm.contextTurns} 轮"
-                ) { vm.setContextTurns(it.roundToInt()) }
+                ) { vm.updateContextTurns(it.roundToInt()) }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -185,7 +185,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     }
                     Switch(
                         checked = vm.autoSpeak,
-                        onCheckedChange = vm::setAutoSpeak,
+                        onCheckedChange = vm::updateAutoSpeak,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = Purple
@@ -199,7 +199,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     range = 0.6..1.8,
                     steps = 11,
                     display = String.format("%.1fx", vm.tts.rate)
-                ) { vm.setSpeechRate(it.toFloat()) }
+                ) { vm.updateSpeechRate(it.toFloat()) }
             }
 
             Spacer(Modifier.height(20.dp))

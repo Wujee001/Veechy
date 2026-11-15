@@ -56,7 +56,7 @@ class TtsPlayer(context: Context) {
         }
     }
 
-    fun setRate(value: Float) {
+    fun updateRate(value: Float) {
         rate = value
         runCatching { tts?.setSpeechRate(value) }
     }

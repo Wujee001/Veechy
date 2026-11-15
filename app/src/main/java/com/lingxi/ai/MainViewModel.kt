@@ -71,7 +71,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     init {
-        tts.setRate(settings.speechRate)
+        tts.updateRate(settings.speechRate)
         val list = conversations
         if (list.isEmpty()) {
             createConversation()
@@ -341,28 +341,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------ 设置写入
 
-    fun setTemperature(v: Float) {
+    fun updateTemperature(v: Float) {
         temperature = v
         settings.temperature = v
     }
 
-    fun setSystemPrompt(v: String) {
+    fun updateSystemPrompt(v: String) {
         systemPrompt = v
         settings.systemPrompt = v
     }
 
-    fun setContextTurns(v: Int) {
+    fun updateContextTurns(v: Int) {
         contextTurns = v
         settings.contextTurns = v
     }
 
-    fun setAutoSpeak(v: Boolean) {
+    fun updateAutoSpeak(v: Boolean) {
         autoSpeak = v
         settings.autoSpeak = v
     }
 
-    fun setSpeechRate(v: Float) {
+    fun updateSpeechRate(v: Float) {
         settings.speechRate = v
-        tts.setRate(v)
+        tts.updateRate(v)
     }
 }
