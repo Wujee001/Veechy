@@ -2,6 +2,8 @@ package com.lingxi.ai.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -26,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lingxi.ai.MainViewModel
@@ -34,13 +37,17 @@ import com.lingxi.ai.ui.theme.InkSoft
 import com.lingxi.ai.ui.theme.Purple
 import com.lingxi.ai.ui.theme.PurpleSoft
 
-private enum class Screen { MAIN, SETTINGS, KNOWLEDGE }
+private enum class Screen { MAIN, SETTINGS, KNOWLEDGE, TIMETABLE }
 
 @Composable
 fun App(vm: MainViewModel = viewModel()) {
     var tab by remember { mutableStateOf(0) }
     var screen by remember { mutableStateOf(Screen.MAIN) }
     val snackbar = remember { SnackbarHostState() }
+
+    // 键盘弹出时隐藏底部导航，给输入框腾空间
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val keyboardOpen = imeBottom > 0
 
     LaunchedEffect(vm.status) {
         val s = vm.status
@@ -59,7 +66,9 @@ fun App(vm: MainViewModel = viewModel()) {
             Screen.MAIN -> Scaffold(
                 modifier = Modifier.imePadding(),
                 containerColor = Color.Transparent,
-                bottomBar = { AppBottomBar(tab) { tab = it } }
+                bottomBar = {
+                    if (!keyboardOpen) AppBottomBar(tab) { tab = it }
+                }
             ) { inner ->
                 Box(Modifier.fillMaxSize().padding(inner)) {
                     when (tab) {
@@ -74,12 +83,17 @@ fun App(vm: MainViewModel = viewModel()) {
                 SettingsScreen(
                     vm = vm,
                     onBack = { screen = Screen.MAIN },
-                    onOpenKnowledge = { screen = Screen.KNOWLEDGE }
+                    onOpenKnowledge = { screen = Screen.KNOWLEDGE },
+                    onOpenTimetable = { screen = Screen.TIMETABLE }
                 )
             }
 
             Screen.KNOWLEDGE -> SwipeBackContainer(onBack = { screen = Screen.SETTINGS }) {
                 KnowledgeScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
+            }
+
+            Screen.TIMETABLE -> SwipeBackContainer(onBack = { screen = Screen.SETTINGS }) {
+                TimetableScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
             }
         }
 

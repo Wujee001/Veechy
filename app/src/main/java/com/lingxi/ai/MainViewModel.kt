@@ -12,8 +12,11 @@ import com.lingxi.ai.data.ChatMessage
 import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
 import com.lingxi.ai.data.InnerVoice
+import com.lingxi.ai.data.Course
+import com.lingxi.ai.data.Feedback
 import com.lingxi.ai.data.Persona
 import com.lingxi.ai.data.Provider
+import com.lingxi.ai.data.Timetable
 import com.lingxi.ai.data.SettingsStore
 import com.lingxi.ai.media.MediaUtil
 import com.lingxi.ai.kb.DocumentParser
@@ -50,6 +53,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     var onboarded by mutableStateOf(settings.onboarded)
+        private set
+
+    var courses by mutableStateOf(Timetable.decode(settings.timetableJson))
+        private set
+    var timetableRules by mutableStateOf(settings.timetableRules)
+        private set
+    var ttBusy by mutableStateOf(false)
         private set
 
     var providers by mutableStateOf(settings.loadProviders())
@@ -383,6 +393,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         // 隐藏人设：只在请求里注入，界面上不暴露
         arr.put(JSONObject().put("role", "system").put("content", Persona.block(settings.gender)))
+        // 真实时间与课表，供自然带出，不要求逐条播报
+        arr.put(
+            JSONObject().put("role", "system").put(
+                "content",
+                "【现实信息】" + Timetable.describe(courses) +
+                    " 这些是真实的时间和课程安排。需要时自然带出来（比如提醒上课、问一句吃没吃），" +
+                    "不要像播报一样逐条念，也不要每句话都提时间。"
+            )
+        )
         if (kbHits.isNotEmpty()) {
             val ctx = kbHits.joinToString("\n\n") { "[资料 · ${it.docName}]\n${it.text}" }
             arr.put(
@@ -591,6 +610,102 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ------------------------------------------------------------ 课表
+
+    fun updateTimetableRules(v: String) {
+        timetableRules = v
+        settings.timetableRules = v
+    }
+
+    fun clearTimetable() {
+        courses = emptyList()
+        settings.timetableJson = ""
+        status = "课表已清空"
+    }
+
+    fun parseTimetable(imagePath: String?) {
+        val provider = activeProvider
+        if (provider == null) {
+            status = "请先在设置里添加 API 供应商"
+            return
+        }
+        if (provider.apiKey.isBlank()) {
+            status = "API Key 未填写"
+            return
+        }
+        val model = activeModelId ?: provider.models.firstOrNull()?.id
+        if (model.isNullOrBlank()) {
+            status = "请先同步并选择模型"
+            return
+        }
+        if (imagePath == null && timetableRules.isBlank()) {
+            status = "请先选择课表截图"
+            return
+        }
+        if (ttBusy) return
+
+        viewModelScope.launch {
+            ttBusy = true
+            val result = runCatching {
+                val messages = timetableMessages(imagePath)
+                val raw = api.streamChat(
+                    base = provider.baseUrl,
+                    key = provider.apiKey,
+                    model = model,
+                    messages = messages,
+                    temperature = 0.1,
+                    onDelta = {}
+                )
+                Timetable.parse(raw)
+            }
+            ttBusy = false
+            result.onSuccess { list ->
+                courses = list
+                settings.timetableJson = Timetable.encode(list)
+                status = "课表已保存：${list.size} 节课"
+            }.onFailure {
+                status = "课表解析失败：${it.message}（需要选一个支持图片的模型）"
+            }
+        }
+    }
+
+    private fun timetableMessages(imagePath: String?): JSONArray {
+        val arr = JSONArray()
+        arr.put(JSONObject().put("role", "system").put("content", TT_PROMPT))
+
+        val parts = JSONArray()
+        val text = buildString {
+            append("请解析这张课表。")
+            if (timetableRules.isNotBlank()) {
+                append("\n\n补充规则：\n")
+                append(timetableRules)
+            }
+        }
+        parts.put(JSONObject().put("type", "text").put("text", text))
+
+        imagePath?.let { path ->
+            val f = File(path)
+            if (f.exists()) {
+                parts.put(
+                    JSONObject().put("type", "image_url")
+                        .put("image_url", JSONObject().put("url", MediaUtil.toDataUrl(f)))
+                )
+            }
+        }
+        arr.put(JSONObject().put("role", "user").put("content", parts))
+        return arr
+    }
+
+    // ------------------------------------------------------------ 反馈
+
+    fun submitFeedback(text: String, imagePath: String?) {
+        viewModelScope.launch {
+            val r = runCatching { Feedback.submit(text, imagePath) }
+            r.onSuccess { status = "反馈已提交，谢谢" }
+                .onFailure { status = "提交失败：${it.message}" }
+        }
+    }
+
     // ------------------------------------------------------------ 设置写入
 
     fun updateTemperature(v: Float) {
@@ -616,5 +731,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun updateSpeechRate(v: Float) {
         settings.speechRate = v
         tts.updateRate(v)
+    }
+
+    private companion object {
+        const val TT_PROMPT =
+            "你是课表解析助手。根据用户提供的课表图片和补充规则，输出一个 JSON 数组，" +
+                "不要任何解释文字，不要代码块标记。每个元素字段：" +
+                "{\"weekday\":1到7的整数(周一=1,周日=7),\"start\":\"HH:MM\",\"end\":\"HH:MM\"," +
+                "\"name\":\"课程名\",\"place\":\"上课地点\",\"teacher\":\"教师\",\"weeks\":\"周次\"}。" +
+                "把图片里的节次按补充规则换算成具体起止时间；同一门课一周多节的拆成多条；" +
+                "地点或教师看不清就留空字符串。"
     }
 }

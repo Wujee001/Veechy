@@ -21,10 +21,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Refresh
@@ -62,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lingxi.ai.MainViewModel
 import com.lingxi.ai.data.Provider
+import com.lingxi.ai.media.MediaUtil
 import com.lingxi.ai.ui.theme.Blue
 import com.lingxi.ai.ui.theme.Ink
 import com.lingxi.ai.ui.theme.InkSoft
@@ -85,8 +91,14 @@ private val Presets = listOf(
 )
 
 @Composable
-fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenKnowledge: () -> Unit = {}) {
+fun SettingsScreen(
+    vm: MainViewModel,
+    onBack: () -> Unit,
+    onOpenKnowledge: () -> Unit = {},
+    onOpenTimetable: () -> Unit = {}
+) {
     var showAdd by remember { mutableStateOf(false) }
+    var showFeedback by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Provider?>(null) }
 
     Scaffold(
@@ -232,13 +244,64 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenKnowledge: () ->
             }
 
             Spacer(Modifier.height(20.dp))
+            SectionTitle("课表")
+            SoftCard {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(onClick = onOpenTimetable)
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.CalendarMonth, null, tint = Purple, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("上课时间", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            if (vm.courses.isEmpty()) "导入课表，聊天时按时间提醒"
+                            else "${vm.courses.size} 节课 · 已按时间生效",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = InkSoft, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            SectionTitle("反馈")
+            SoftCard {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { showFeedback = true }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.Email, null, tint = Purple, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("意见与问题", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "文字、截图都可以，直接提交给我",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = InkSoft, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
             SectionTitle("关于")
             SoftCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.4.3", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.5.0", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -254,6 +317,10 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenKnowledge: () ->
                 )
             }
         }
+    }
+
+    if (showFeedback) {
+        FeedbackDialog(vm = vm, onDismiss = { showFeedback = false })
     }
 
     if (showAdd) {
@@ -616,6 +683,62 @@ private fun SliderRow(
             )
         )
     }
+}
+
+@Composable
+private fun FeedbackDialog(vm: MainViewModel, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var text by remember { mutableStateOf("") }
+    var imagePath by remember { mutableStateOf<String?>(null) }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) imagePath = MediaUtil.saveFromUri(ctx, uri)?.absolutePath
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("意见与问题") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 6,
+                    placeholder = {
+                        Text(
+                            "说说遇到的问题，或者希望它变成什么样",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    shape = RoundedCornerShape(10.dp)
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = { picker.launch("image/*") },
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Text("附图", style = MaterialTheme.typography.labelSmall) }
+                    if (imagePath != null) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "已选择 1 张",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Purple
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton({
+                vm.submitFeedback(text, imagePath)
+                onDismiss()
+            }) { Text("提交") }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("取消") } }
+    )
 }
 
 @Composable
