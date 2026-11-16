@@ -57,6 +57,11 @@ fun App(vm: MainViewModel = viewModel()) {
         }
     }
 
+    // 重新填写完成后回到主界面，不留在设置页
+    LaunchedEffect(vm.onboarded) {
+        if (vm.onboarded) screen = Screen.MAIN
+    }
+
     GradientBackground {
         Box(Modifier.fillMaxSize()) {
         if (!vm.onboarded) {

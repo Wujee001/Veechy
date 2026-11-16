@@ -272,4 +272,8 @@ class ChatStore(context: Context) {
     fun delete(id: String) {
         runCatching { File(dir, "$id.json").delete() }
     }
+
+    fun clearAll() {
+        runCatching { dir.listFiles()?.forEach { it.delete() } }
+    }
 }

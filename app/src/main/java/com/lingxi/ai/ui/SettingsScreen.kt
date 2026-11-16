@@ -93,6 +93,7 @@ fun SettingsScreen(
     onOpenTimetable: () -> Unit = {}
 ) {
     var showAdd by remember { mutableStateOf(false) }
+    var showReset by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Provider?>(null) }
 
     Scaffold(
@@ -280,7 +281,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.5.3", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.5.4", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -295,7 +296,24 @@ fun SettingsScreen(
                     color = InkSoft
                 )
             }
+
+            Spacer(Modifier.height(24.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(
+                    "重新填写资料",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkSoft.copy(alpha = 0.75f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showReset = true }
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
         }
+    }
+
+    if (showReset) {
+        ResetProfileDialog(vm = vm, onDismiss = { showReset = false })
     }
 
     if (showAdd) {
@@ -656,6 +674,41 @@ private fun SliderRow(
                 activeTrackColor = Purple,
                 inactiveTrackColor = LineSoft
             )
+        )
+    }
+}
+
+@Composable
+private fun ResetProfileDialog(vm: MainViewModel, onDismiss: () -> Unit) {
+    var step by remember { mutableStateOf(1) }
+    val count = vm.conversations.size
+
+    if (step == 1) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("重新填写资料") },
+            text = {
+                Text(
+                    "更改性别会清空所有对话记录，且无法恢复。\n\n" +
+                        "课表、知识库、API 供应商不受影响。\n\n" +
+                        "当前共 $count 个会话。"
+                )
+            },
+            confirmButton = { TextButton({ step = 2 }) { Text("继续") } },
+            dismissButton = { TextButton(onDismiss) { Text("取消") } }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("再确认一次") },
+            text = { Text("$count 个会话将被永久删除，无法找回。确认继续？") },
+            confirmButton = {
+                TextButton({
+                    vm.resetProfile()
+                    onDismiss()
+                }) { Text("清空并继续", color = Color(0xFFE5484D)) }
+            },
+            dismissButton = { TextButton(onDismiss) { Text("取消") } }
         )
     }
 }

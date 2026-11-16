@@ -128,6 +128,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         loadGift()
     }
 
+    /**
+     * 重新填写资料。性别决定隐藏人设，改了等于换人，因此清空全部对话；
+     * 课表、知识库、API 供应商保持不动。
+     */
+    fun resetProfile() {
+        chatStore.clearAll()
+        conversations = emptyList()
+        current = null
+        createConversation()
+        settings.onboarded = false
+        onboarded = false
+        status = "对话已清空，请重新填写资料"
+    }
+
     /** 内置见面礼：四六级写作高级提分词汇。只装一次。 */
     private fun loadGift() {
         if (settings.giftLoaded) return
