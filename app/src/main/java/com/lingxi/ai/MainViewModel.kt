@@ -13,7 +13,6 @@ import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
 import com.lingxi.ai.data.InnerVoice
 import com.lingxi.ai.data.Course
-import com.lingxi.ai.data.Feedback
 import com.lingxi.ai.data.Persona
 import com.lingxi.ai.data.Provider
 import com.lingxi.ai.data.Timetable
@@ -694,16 +693,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         arr.put(JSONObject().put("role", "user").put("content", parts))
         return arr
-    }
-
-    // ------------------------------------------------------------ 反馈
-
-    fun submitFeedback(text: String, imagePath: String?) {
-        viewModelScope.launch {
-            val r = runCatching { Feedback.submit(text, imagePath) }
-            r.onSuccess { status = "反馈已提交，谢谢" }
-                .onFailure { status = "提交失败：${it.message}" }
-        }
     }
 
     // ------------------------------------------------------------ 设置写入
