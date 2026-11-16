@@ -11,13 +11,27 @@ android {
         applicationId = "com.lingxi.ai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "1.4.3"
+        versionCode = 12
+        versionName = "1.5.0"
+    }
+
+    // 固定签名：保证每次构建的证书一致，覆盖安装不会丢数据
+    signingConfigs {
+        create("shared") {
+            storeFile = file("keystore.jks")
+            storePassword = "wujee2026"
+            keyAlias = "wujee"
+            keyPassword = "wujee2026"
+        }
     }
 
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shared")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
