@@ -88,26 +88,40 @@ object Timetable {
         if (courses.isEmpty()) return sb.toString()
 
         val today = courses.filter { it.weekday == weekday }.sortedBy { it.start }
+
         if (today.isEmpty()) {
             sb.append("今天没有课。")
-            return sb.toString()
+        } else {
+            val current = today.firstOrNull { nowMin in toMin(it.start)..toMin(it.end) }
+            val next = today.firstOrNull { toMin(it.start) > nowMin }
+
+            if (current != null) {
+                sb.append("正在上《${current.name}》")
+                if (current.place.isNotBlank()) sb.append("（${current.place}）")
+                sb.append("，${toMin(current.end) - nowMin} 分钟后下课。")
+            }
+            if (next != null) {
+                sb.append("接下来 ${next.start} 上《${next.name}》")
+                if (next.place.isNotBlank()) sb.append("，地点 ${next.place}")
+                sb.append("。")
+            }
+            if (current == null && next == null) {
+                sb.append("今天的课已经上完了。")
+            }
         }
 
-        val current = today.firstOrNull { nowMin in toMin(it.start)..toMin(it.end) }
-        val next = today.firstOrNull { toMin(it.start) > nowMin }
-
-        if (current != null) {
-            sb.append("正在上《${current.name}》")
-            if (current.place.isNotBlank()) sb.append("（${current.place}）")
-            sb.append("，${toMin(current.end) - nowMin} 分钟后下课。")
-        }
-        if (next != null) {
-            sb.append("接下来 ${next.start} 上《${next.name}》")
-            if (next.place.isNotBlank()) sb.append("，地点 ${next.place}")
-            sb.append("。")
-        }
-        if (current == null && next == null) {
-            sb.append("今天的课已经上完了。")
+        // 整周课表：用户问「明天」「周四」时模型要答得出来
+        sb.append("\n完整课表：\n")
+        for (d in 1..7) {
+            val list = courses.filter { it.weekday == d }.sortedBy { it.start }
+            if (list.isEmpty()) continue
+            sb.append(WEEK[d]).append("：")
+            list.forEachIndexed { i, c ->
+                if (i > 0) sb.append("；")
+                sb.append("${c.start}-${c.end} ${c.name}")
+                if (c.place.isNotBlank()) sb.append(" @${c.place}")
+            }
+            sb.append("\n")
         }
         return sb.toString()
     }
