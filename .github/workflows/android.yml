@@ -64,6 +64,15 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "out/WujeesAI-${GITHUB_REF_NAME}.apk"
           ls -lh out
 
+      - name: Verify signature
+        if: steps.build.outcome == 'success'
+        run: |
+          APK="out/WujeesAI-${GITHUB_REF_NAME}.apk"
+          AS="$(command -v apksigner || echo "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner")"
+          OUT=$("$AS" verify --print-certs "$APK" 2>&1 || echo "VERIFY FAILED")
+          echo "::notice title=APK signature::$(echo "$OUT" | head -6 | tr '\n' '~')"
+          "$AS" verify "$APK" || { echo "::error title=Unsigned APK::签名校验未通过"; exit 1; }
+
       - name: Upload artifact
         if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4

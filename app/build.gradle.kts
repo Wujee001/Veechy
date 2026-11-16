@@ -11,8 +11,8 @@ android {
         applicationId = "com.lingxi.ai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 13
-        versionName = "1.5.1"
+        versionCode = 14
+        versionName = "1.5.2"
     }
 
     // 固定签名：保证每次构建的证书一致，覆盖安装不会丢数据
@@ -22,6 +22,10 @@ android {
             storePassword = "wujee2026"
             keyAlias = "wujee"
             keyPassword = "wujee2026"
+            // 部分国产 ROM 只认 v1(JAR) 签名，缺了会报「未包含任何证书」
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
