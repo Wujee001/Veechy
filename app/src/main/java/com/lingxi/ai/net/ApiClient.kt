@@ -123,11 +123,8 @@ class ApiClient {
                 // 有些服务端忽略 stream=true 直接返回 JSON
                 if (ctype.contains("application/json")) {
                     val json = JSONObject(body.string())
-                    val text = json.optJSONArray("choices")
-                        ?.optJSONObject(0)
-                        ?.optJSONObject("message")
-                        ?.optString("content")
-                        .orEmpty()
+                    val msg = json.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+                    val text = if (msg == null || msg.isNull("content")) "" else msg.optString("content", "")
                     if (text.isNotEmpty()) withContext(Dispatchers.Main) { onDelta(text) }
                     return@withContext text
                 }
@@ -144,16 +141,19 @@ class ApiClient {
                         ?.optJSONObject(0)
                         ?.optJSONObject("delta") ?: continue
 
-                    val content = delta.optString("content", "")
+                    // 注意：JSONObject.optString 对 JSON null 会返回字符串 "null"，
+                    // DeepSeek 等会在首包/尾包给出 content:null，必须先判空
+                    val content = if (delta.isNull("content")) "" else delta.optString("content", "")
                     if (content.isNotEmpty()) {
                         sb.append(content)
                         // 回调切回主线程，保证 Compose 状态写入安全
                         withContext(Dispatchers.Main) { onDelta(content) }
                     }
-                    val reasoning = delta.optString("reasoning_content", "")
-                    val reasoning2 = if (reasoning.isEmpty()) delta.optString("reasoning", "") else reasoning
-                    if (reasoning2.isNotEmpty()) {
-                        withContext(Dispatchers.Main) { onReasoning(reasoning2) }
+                    val rc = if (delta.isNull("reasoning_content")) "" else delta.optString("reasoning_content", "")
+                    val r2 = if (delta.isNull("reasoning")) "" else delta.optString("reasoning", "")
+                    val reasoning = if (rc.isEmpty()) r2 else rc
+                    if (reasoning.isNotEmpty() && reasoning != "null") {
+                        withContext(Dispatchers.Main) { onReasoning(reasoning) }
                     }
                 }
                 sb.toString()
