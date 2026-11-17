@@ -81,7 +81,7 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     capturing = true
                     val file = camera.snap()
                     capturing = false
-                    vm.send(heard, file?.absolutePath, speak = true)
+                    vm.send(heard, listOfNotNull(file?.absolutePath), speak = true)
                 }
             }
         }
@@ -255,7 +255,7 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                         capturing = true
                         val f = camera.snap()
                         capturing = false
-                        vm.send("描述你看到的画面，用简短几句话。", f?.absolutePath, speak = true)
+                        vm.send("描述你看到的画面，用简短几句话。", listOfNotNull(f?.absolutePath), speak = true)
                     }
                 }
             }

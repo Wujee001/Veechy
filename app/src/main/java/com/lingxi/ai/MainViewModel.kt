@@ -48,6 +48,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var kbEnabled by mutableStateOf(settings.kbEnabled)
         private set
+    var nightMode by mutableStateOf(settings.nightMode)
+        private set
     var bookPreview by mutableStateOf<IsbnLookup.BookInfo?>(null)
         private set
 
@@ -300,7 +302,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         current?.let { push(it) }
     }
 
-    fun send(text: String, imagePath: String? = null, speak: Boolean = false) {
+    fun send(text: String, imagePaths: List<String> = emptyList(), speak: Boolean = false) {
         if (streaming) return
         val provider = activeProvider
         if (provider == null) {
@@ -316,11 +318,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             status = "请先同步并选择一个模型"
             return
         }
-        if (text.isBlank() && imagePath == null) return
+        if (text.isBlank() && imagePaths.isEmpty()) return
 
         val convo = current ?: return
         val base = if (convo.messages.isEmpty()) text.take(18).ifBlank { "图片对话" } else convo.title
-        val userMsg = ChatMessage(role = "user", text = text.trim(), imagePath = imagePath)
+        val userMsg = ChatMessage(role = "user", text = text.trim(), images = imagePaths)
         val placeholder = ChatMessage(role = "assistant", text = "")
 
         val withUser = convo.copy(
@@ -407,11 +409,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // 隐藏人设：只在请求里注入，界面上不暴露
         arr.put(JSONObject().put("role", "system").put("content", Persona.block(settings.gender)))
         // 真实时间与课表，供自然带出，不要求逐条播报
+        val prev = history.dropLast(1).lastOrNull()
+        val gap = if (prev != null) System.currentTimeMillis() - prev.time else 0L
+        val gapLine = when {
+            gap <= 0L -> ""
+            gap >= 48 * 3600_000L -> "上一轮对话在 ${gap / (24 * 3600_000L)} 天前。"
+            gap >= 24 * 3600_000L -> "上一轮对话是昨天。"
+            gap >= 4 * 3600_000L -> "上一轮对话在 ${gap / 3600_000L} 小时前。"
+            else -> ""
+        }
         arr.put(
             JSONObject().put("role", "system").put(
                 "content",
                 "【现实信息】" + Timetable.describe(courses) +
-                    " 这些是真实的时间和课程安排。问到某天上什么课，直接按上面的完整课表回答；" +
+                    (if (gapLine.isNotEmpty()) " $gapLine" else "") +
+                    " 以上时间来自设备实时时钟，优先于对话历史里出现的任何时间说法；" +
+                    "如果上一轮是很久以前，不要把它当成同一天。" +
+                    "问到某天上什么课，直接按上面的完整课表回答；" +
                     "其他时候需要就自然带出来（比如提醒上课、问一句吃没吃），" +
                     "不要像播报一样逐条念，也不要每句话都提时间。"
             )
@@ -431,22 +445,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (m.error) continue
             if (m.role == "assistant" && m.text.isBlank()) continue
             val obj = JSONObject().put("role", m.role)
-            val img = m.imagePath?.let { File(it) }?.takeIf { it.exists() }
-            if (img != null) {
+            val imgs = m.images.map { File(it) }.filter { it.exists() }
+            if (imgs.isNotEmpty()) {
                 val parts = JSONArray()
                 parts.put(
                     JSONObject()
                         .put("type", "text")
                         .put("text", m.text.ifBlank { "描述这张图片" })
                 )
-                parts.put(
-                    JSONObject()
-                        .put("type", "image_url")
-                        .put(
-                            "image_url",
-                            JSONObject().put("url", MediaUtil.toDataUrl(img))
-                        )
-                )
+                imgs.forEach { img ->
+                    parts.put(
+                        JSONObject()
+                            .put("type", "image_url")
+                            .put(
+                                "image_url",
+                                JSONObject().put("url", MediaUtil.toDataUrl(img))
+                            )
+                    )
+                }
                 obj.put("content", parts)
             } else if (m.text.isNotBlank()) {
                 obj.put("content", m.text)
@@ -491,6 +507,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         kb.remove(id)
         kbDocs = kb.docs
         status = "已从知识库删除"
+    }
+
+    fun updateNightMode(value: Boolean) {
+        nightMode = value
+        settings.nightMode = value
+    }
+
+    /** 手写文本入库，保存为 txt。 */
+    fun addTextKnowledge(title: String, body: String) {
+        if (body.isBlank()) {
+            status = "内容为空"
+            return
+        }
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) {
+                runCatching { kb.add(title.ifBlank { "手写笔记" }, "txt", "手写", body) }
+            }
+            r.onSuccess {
+                kbDocs = kb.docs
+                status = "已存入知识库：${it.name}"
+            }.onFailure { status = "保存失败：${it.message}" }
+        }
     }
 
     fun lookupIsbn(raw: String) {

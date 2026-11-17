@@ -91,7 +91,7 @@ data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val role: String,
     val text: String = "",
-    val imagePath: String? = null,
+    val images: List<String> = emptyList(),
     val reasoning: String? = null,
     val error: Boolean = false,
     val time: Long = System.currentTimeMillis()
@@ -100,22 +100,32 @@ data class ChatMessage(
         put("id", id)
         put("role", role)
         put("text", text)
-        put("imagePath", imagePath ?: "")
+        put("images", JSONArray().also { a -> images.forEach { a.put(it) } })
         put("reasoning", reasoning ?: "")
         put("error", error)
         put("time", time)
     }
 
     companion object {
-        fun fromJson(o: JSONObject) = ChatMessage(
-            id = o.optString("id", UUID.randomUUID().toString()),
-            role = o.optString("role", "user"),
-            text = o.optString("text"),
-            imagePath = o.optString("imagePath").ifBlank { null },
-            reasoning = o.optString("reasoning").ifBlank { null },
-            error = o.optBoolean("error"),
-            time = o.optLong("time", System.currentTimeMillis())
-        )
+        fun fromJson(o: JSONObject): ChatMessage {
+            val list = ArrayList<String>()
+            o.optJSONArray("images")?.let { a ->
+                for (i in 0 until a.length()) a.optString(i).takeIf { it.isNotBlank() }?.let(list::add)
+            }
+            // 兼容 1.5.x 之前的单图字段
+            if (list.isEmpty()) {
+                o.optString("imagePath").takeIf { it.isNotBlank() }?.let(list::add)
+            }
+            return ChatMessage(
+                id = o.optString("id", UUID.randomUUID().toString()),
+                role = o.optString("role", "user"),
+                text = o.optString("text"),
+                images = list,
+                reasoning = o.optString("reasoning").ifBlank { null },
+                error = o.optBoolean("error"),
+                time = o.optLong("time", System.currentTimeMillis())
+            )
+        }
     }
 }
 
@@ -209,6 +219,10 @@ class SettingsStore(context: Context) {
         get() = sp.getString(KEY_TT_RULES, "") ?: ""
         set(value) = sp.edit().putString(KEY_TT_RULES, value).apply()
 
+    var nightMode: Boolean
+        get() = sp.getBoolean(KEY_NIGHT, false)
+        set(value) = sp.edit().putBoolean(KEY_NIGHT, value).apply()
+
     fun loadProviders(): List<Provider> {
         val raw = sp.getString(KEY_PROVIDERS, null) ?: return emptyList()
         return runCatching {
@@ -243,6 +257,7 @@ class SettingsStore(context: Context) {
         private const val KEY_GIFT = "gift_loaded"
         private const val KEY_TT = "timetable_json"
         private const val KEY_TT_RULES = "timetable_rules"
+        private const val KEY_NIGHT = "night_mode"
     }
 }
 

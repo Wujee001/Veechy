@@ -336,6 +336,28 @@ private fun buildInline(src: String, base: Color): AnnotatedString {
                 }
             }
 
+            // 正文中间夹的心理描写：小字、斜体、浅色
+            src[i] == '〔' -> {
+                val end = src.indexOf('〕', i + 1)
+                if (end > i + 1 && end - i <= 120) {
+                    b.withStyle(
+                        SpanStyle(
+                            fontStyle = FontStyle.Italic,
+                            color = base.copy(alpha = 0.62f),
+                            fontSize = 13.sp
+                        )
+                    ) {
+                        append("（")
+                        append(src.substring(i + 1, end))
+                        append("）")
+                    }
+                    i = end + 1
+                } else {
+                    b.append(src[i])
+                    i++
+                }
+            }
+
             src[i] == '[' -> {
                 val close = src.indexOf("](", i)
                 val end = if (close > 0) src.indexOf(')', close) else -1

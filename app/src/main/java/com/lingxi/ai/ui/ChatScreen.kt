@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddCircleOutline
@@ -94,11 +97,14 @@ import java.util.Locale
 @Composable
 fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
-    var pendingImage by remember { mutableStateOf<String?>(null) }
+    var pendingImages by remember { mutableStateOf<List<String>>(emptyList()) }
     var showHistory by remember { mutableStateOf(false) }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) pendingImage = MediaUtil.saveFromUri(context, uri)?.absolutePath
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) {
+            val saved = uris.mapNotNull { MediaUtil.saveFromUri(context, it)?.absolutePath }
+            pendingImages = (pendingImages + saved).take(9)
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -131,10 +137,10 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
 
         InputBar(
             vm = vm,
-            pendingImage = pendingImage,
+            pendingImages = pendingImages,
             onPickImage = { picker.launch("image/*") },
-            onClearImage = { pendingImage = null },
-            onSent = { pendingImage = null }
+            onRemoveImage = { path -> pendingImages = pendingImages - path },
+            onSent = { pendingImages = emptyList() }
         )
     }
 
@@ -315,7 +321,9 @@ fun MessageBubble(m: ChatMessage) {
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            m.imagePath?.let { path ->
+            SelectionContainer {
+            Column {
+            m.images.forEach { path ->
                 val bmp = rememberBmp(path)
                 if (bmp != null) {
                     Image(
@@ -324,10 +332,10 @@ fun MessageBubble(m: ChatMessage) {
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 220.dp)
+                            .heightIn(max = 200.dp)
                             .clip(RoundedCornerShape(12.dp))
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                 }
             }
 
@@ -361,6 +369,8 @@ fun MessageBubble(m: ChatMessage) {
                     )
                 }
             }
+            }
+            }
         }
     }
 }
@@ -375,9 +385,9 @@ private fun rememberBmp(path: String): Bitmap? = remember(path) {
 @Composable
 private fun InputBar(
     vm: MainViewModel,
-    pendingImage: String?,
+    pendingImages: List<String>,
     onPickImage: () -> Unit,
-    onClearImage: () -> Unit,
+    onRemoveImage: (String) -> Unit,
     onSent: () -> Unit
 ) {
     val ctx = LocalContext.current
@@ -401,22 +411,42 @@ private fun InputBar(
             .background(Color.White.copy(alpha = 0.9f))
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        pendingImage?.let { path ->
-            val bmp = rememberBmp(path)
-            Row(Modifier.padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (bmp != null) {
-                    Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text("已附加图片", style = MaterialTheme.typography.bodySmall, color = InkSoft)
-                Spacer(Modifier.weight(1f))
-                IconButton({ onClearImage() }) {
-                    Icon(Icons.Rounded.Close, "移除", tint = InkSoft, modifier = Modifier.size(18.dp))
+        if (pendingImages.isNotEmpty()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                pendingImages.forEach { path ->
+                    Box {
+                        val bmp = rememberBmp(path)
+                        if (bmp != null) {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp))
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable { onRemoveImage(path) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                "移除",
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -470,8 +500,8 @@ private fun InputBar(
                         vm.stopGenerating()
                     } else {
                         val t = text.trim()
-                        if (t.isNotBlank() || pendingImage != null) {
-                            vm.send(t, pendingImage)
+                        if (t.isNotBlank() || pendingImages.isNotEmpty()) {
+                            vm.send(t, pendingImages)
                             text = ""
                             onSent()
                         }

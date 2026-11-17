@@ -39,5 +39,9 @@ object InnerVoice {
         return if (partial.length <= MAX_THOUGHT) partial.ifBlank { null } to "" else null to t
     }
 
+    /** 朗读用：去掉开头独白，也去掉正文里夹的〔〕片段。 */
     fun bodyOnly(raw: String): String = split(raw).second
+        .replace(Regex("〔[^〕]*〕"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
 }
