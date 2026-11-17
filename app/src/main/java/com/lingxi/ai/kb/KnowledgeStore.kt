@@ -46,6 +46,10 @@ data class KbHit(val docName: String, val text: String, val score: Double)
  */
 class KnowledgeStore(context: Context) {
 
+    private companion object {
+        const val WHOLE_DOC_LIMIT = 6000
+    }
+
     private val root = File(context.filesDir, "kb").apply { mkdirs() }
     private val indexFile = File(root, "index.json")
     private val cache = HashMap<String, List<String>>()
@@ -72,7 +76,8 @@ class KnowledgeStore(context: Context) {
     fun add(name: String, kind: String, source: String, raw: String): KbDoc {
         val text = normalize(raw)
         require(text.isNotBlank()) { "没有提取到文本" }
-        val chunks = split(text)
+        // 短文档整篇作为一个块：试卷、笔记这类被切开就失去连贯性，不如整份给模型
+        val chunks = if (text.length <= WHOLE_DOC_LIMIT) listOf(text) else split(text)
         val id = UUID.randomUUID().toString()
         val dir = File(root, id).apply { mkdirs() }
         val arr = JSONArray()

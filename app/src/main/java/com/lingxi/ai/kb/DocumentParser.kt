@@ -20,54 +20,53 @@ object DocumentParser {
     @Volatile
     private var pdfReady = false
 
+    /** 只接受这些扩展名，其他一律拒绝，避免把图片/压缩包当文本读进来。 */
+    private val ALLOWED = setOf(
+        "pdf", "docx", "docm", "pptx", "pptm",
+        "txt", "md", "markdown", "csv", "json", "log"
+    )
+
     fun parse(context: Context, uri: Uri): ParsedDoc {
         val name = queryName(context, uri) ?: "未命名文档"
         val ext = name.substringAfterLast('.', "").lowercase()
 
+        if (ext !in ALLOWED) {
+            throw IllegalArgumentException(
+                "不支持的文件类型${if (ext.isBlank()) "" else "：.$ext"}，只接受 PDF / DOCX / PPTX / TXT / MD / CSV"
+            )
+        }
+
         val text = context.contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "无法打开文件" }
-            readByExt(context, ext, input) { context.contentResolver.openInputStream(uri) }
+            readByExt(context, ext, input)
         }
 
         if (text.isBlank()) {
             throw IllegalStateException("没有提取到文本，可能是扫描版或加密文件")
         }
-        return ParsedDoc(name, ext.ifBlank { "txt" }, text)
+        return ParsedDoc(name, ext, text)
     }
 
     /** 读取 APK 内置 assets 里的文档（见面礼）。 */
     fun parseAsset(context: Context, assetName: String): ParsedDoc {
         val ext = assetName.substringAfterLast('.', "txt").lowercase()
         val text = context.assets.open(assetName).use { input ->
-            readByExt(context, ext, input) { context.assets.open(assetName) }
+            readByExt(context, ext, input)
         }
         if (text.isBlank()) throw IllegalStateException("内置文档没有提取到文本")
         return ParsedDoc(assetName.substringBeforeLast('.', assetName), ext, text)
     }
 
-    private fun readByExt(
-        context: Context,
-        ext: String,
-        input: InputStream,
-        reopen: () -> InputStream?
-    ): String = cleanup(
+    private fun readByExt(context: Context, ext: String, input: InputStream): String = cleanup(
         when (ext) {
             "pdf" -> readPdfStream(context, input)
             "docx", "docm" -> readDocxStream(input)
             "pptx", "pptm" -> readPptxStream(input)
-            "txt", "md", "markdown", "csv", "json", "log" -> readTextStream(input)
             else -> {
-                // 扩展名不可靠时按内容嗅探
-                val head = readTextStream(input, limit = 4)
-                if (head.startsWith("PK")) {
-                    reopen()?.use { s ->
-                        runCatching { readDocxStream(s) }.getOrDefault("").ifBlank {
-                            reopen()?.use { s2 -> readPptxStream(s2) } ?: ""
-                        }
-                    } ?: ""
-                } else {
-                    reopen()?.use { readTextStream(it) } ?: ""
-                }
+                val raw = readTextStream(input)
+                val bad = raw.count { it == '�' || (it < ' ' && it != '\n' && it != '\r' && it != '\t') }
+                require(raw.isEmpty() || bad * 100 / raw.length < 2) { "这不是文本文件，内容无法读取" }
+                raw
             }
         }
     )

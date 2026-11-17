@@ -24,19 +24,23 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.UploadFile
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -67,6 +71,7 @@ import java.util.Locale
 fun KnowledgeScreen(vm: MainViewModel, onBack: () -> Unit) {
     val ctx = LocalContext.current
     var isbn by remember { mutableStateOf("") }
+    var showTextDialog by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) vm.importDocument(uri)
@@ -151,6 +156,14 @@ fun KnowledgeScreen(vm: MainViewModel, onBack: () -> Unit) {
                     Icon(Icons.Rounded.UploadFile, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("选择文件")
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showTextDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("写一段文字", style = MaterialTheme.typography.labelSmall, color = Purple)
                 }
             }
 
@@ -323,6 +336,57 @@ fun KnowledgeScreen(vm: MainViewModel, onBack: () -> Unit) {
             }
         }
     }
+
+    if (showTextDialog) {
+        TextKnowledgeDialog(
+            onDismiss = { showTextDialog = false },
+            onSave = { t, b ->
+                vm.addTextKnowledge(t, b)
+                showTextDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun TextKnowledgeDialog(onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
+    var title by remember { mutableStateOf("") }
+    var body by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("写一段文字") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("标题", style = MaterialTheme.typography.labelSmall) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text("内容", style = MaterialTheme.typography.labelSmall) },
+                    minLines = 5,
+                    maxLines = 12,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "保存后自动存为 txt，参与对话检索",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkSoft
+                )
+            }
+        },
+        confirmButton = {
+            TextButton({ if (body.isNotBlank()) onSave(title, body) }) { Text("保存") }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("取消") } }
+    )
 }
 
 @Composable
