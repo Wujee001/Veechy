@@ -12,7 +12,10 @@ import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
 import com.lingxi.ai.data.InnerVoice
 import com.lingxi.ai.audio.TtsPlayer
+import com.lingxi.ai.data.CalendarHelper
 import com.lingxi.ai.data.Course
+import com.lingxi.ai.data.LocationHelper
+import com.lingxi.ai.data.WeatherClient
 import com.lingxi.ai.data.Persona
 import com.lingxi.ai.data.Provider
 import com.lingxi.ai.data.Timetable
@@ -409,7 +412,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             append(" 天气：").append(weatherCache)
         }
         if (calendarEnabled) {
-            val c = runCatching { CalendarHelper.upcoming(getApplication()) }.getOrDefault("")
+            val c = runCatching { CalendarHelper.upcoming(getApplication<Application>()) }.getOrDefault("")
             if (c.isNotBlank()) append(" 接下来两天的日程：").append(c)
         }
     }

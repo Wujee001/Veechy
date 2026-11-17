@@ -35,80 +35,22 @@ object LocationHelper {
 
         // 先用系统缓存，通常立刻拿到
         runCatching {
-            lm.getProviders(true).forEach { p ->
-                lm.getLastKnownLocation(p)?.let { return it.latitude to it.longitude }
-            }
-        }
-
-        return runCatching {
-            suspendCancellableCoroutine<Pair<Double, Double>?> { cont ->
-                val provider = when {
-                    lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-                    lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-                    else -> null
-                }
-                if (provider == null) {
-                    cont.resume(null)
-                    return@suspendCancellableCoroutine
-                }
-
-                val handler = Handler(Looper.getMainLooper())
-                val listener = object : LocationListener {
-                    override fun onLocationChanged(location: Location) {
-                        if (cont.isActive) cont.resume(location.latitude to location.longitude)
-                    }
-
-                    override fun onProviderEnabled(provider: String) {}
-                    override fun onProviderDisabled(provider: String) {}
-                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-                }
-
-                runCatching { lm.requestSingleUpdate(provider, listener, Looper.getMainLooper()) }
-                handler.postDelayed({
-                    runCatching { lm.removeUpdates(listener) }
-                    if (cont.isActive) cont.resume(null)
-                }, 6000)
-            }
-        }.getOrNull()
-    }
-
-    private fun has(context: Context, permission: String) =
-        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-}
-
-/** Open-Meteo：免费、不需要 key。 */
-object WeatherClient {
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
-
-    suspend fun summary(lat: Double, lon: Double): String? = withContext(Dispatchers.IO) {
-        val url = "https://api.open-meteo.com/v1/forecast" +
-            "?latitude=" + String.format(Locale.US, "%.3f", lat) +
-            "&longitude=" + String.format(Locale.US, "%.3f", lon) +
-            "&hourly=temperature_2m,precipitation_probability" +
-            "&forecast_days=2&timezone=auto"
-
-        runCatching {
             client.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val text = resp.body?.string() ?: return null
-                val hourly = JSONObject(text).optJSONObject("hourly") ?: return null
-                val times = hourly.optJSONArray("time") ?: return null
-                val temps = hourly.optJSONArray("temperature_2m") ?: return null
+                if (!resp.isSuccessful) return@use null
+                val body = resp.body?.string() ?: return@use null
+                val hourly = JSONObject(body).optJSONObject("hourly") ?: return@use null
+                val times = hourly.optJSONArray("time") ?: return@use null
+                val temps = hourly.optJSONArray("temperature_2m") ?: return@use null
                 val precs = hourly.optJSONArray("precipitation_probability")
 
                 val nowHour = SimpleDateFormat("yyyy-MM-dd'T'HH:00", Locale.US).format(Date())
-                var idx = -1
+                var idx = 0
                 for (i in 0 until times.length()) {
                     if (times.optString(i) == nowHour) {
                         idx = i
                         break
                     }
                 }
-                if (idx < 0) idx = 0
 
                 val cur = temps.optDouble(idx, Double.NaN)
                 var maxPrecip = 0
@@ -116,8 +58,8 @@ object WeatherClient {
                 var maxT = -Double.MAX_VALUE
                 val end = minOf(idx + 8, times.length())
                 for (i in idx until end) {
-                    val p = if (precs == null) 0 else precs.optInt(i, 0)
-                    if (p > maxPrecip) maxPrecip = p
+                    val pr = if (precs == null) 0 else precs.optInt(i, 0)
+                    if (pr > maxPrecip) maxPrecip = pr
                     val t = temps.optDouble(i, Double.NaN)
                     if (!t.isNaN()) {
                         if (t < minT) minT = t
