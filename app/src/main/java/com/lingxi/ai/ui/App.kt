@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -62,8 +63,17 @@ fun App(vm: MainViewModel = viewModel()) {
         if (vm.onboarded) screen = Screen.MAIN
     }
 
+    val dim = if (vm.nightMode) 0.35f else 0f
+
     GradientBackground {
-        Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    drawContent()
+                    if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
+                }
+        ) {
         if (!vm.onboarded) {
             OnboardingScreen(vm)
         } else {

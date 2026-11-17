@@ -275,13 +275,36 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+            SectionTitle("显示")
+            SoftCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("夜间模式", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "整体调暗，配色不变",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Switch(
+                        checked = vm.nightMode,
+                        onCheckedChange = vm::updateNightMode,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
             SectionTitle("关于")
             SoftCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.5.4", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.6.0", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,

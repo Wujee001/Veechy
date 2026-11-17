@@ -111,17 +111,17 @@ object Timetable {
         }
 
         // 整周课表：用户问「明天」「周四」时模型要答得出来
-        sb.append("\n完整课表：\n")
+        sb.append("本周课表：")
         for (d in 1..7) {
             val list = courses.filter { it.weekday == d }.sortedBy { it.start }
             if (list.isEmpty()) continue
-            sb.append(WEEK[d]).append("：")
+            sb.append(WEEK[d]).append(" ")
             list.forEachIndexed { i, c ->
-                if (i > 0) sb.append("；")
-                sb.append("${c.start}-${c.end} ${c.name}")
-                if (c.place.isNotBlank()) sb.append(" @${c.place}")
+                if (i > 0) sb.append(";")
+                sb.append(c.start).append('-').append(c.end).append(' ').append(c.name)
+                if (c.place.isNotBlank()) sb.append('@').append(c.place)
             }
-            sb.append("\n")
+            sb.append("。")
         }
         return sb.toString()
     }
