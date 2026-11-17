@@ -132,8 +132,9 @@ class SpeechInput(private val context: Context) {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 800L)
         }
+        // 不要在这里先 cancel()：部分机型 cancel 是异步的，
+        // 紧接着 startListening 会直接返回 ERROR_CLIENT
         runCatching {
-            recognizer?.cancel()
             recognizer?.startListening(intent)
             listening = true
         }.onFailure { errorText = it.message }

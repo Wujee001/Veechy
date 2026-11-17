@@ -58,6 +58,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var calendarEnabled by mutableStateOf(settings.calendarEnabled)
         private set
+    var timetableEnabled by mutableStateOf(settings.timetableEnabled)
+        private set
+    var asrModel by mutableStateOf(settings.asrModel)
+        private set
+    var weatherStatus by mutableStateOf(if (settings.weatherEnabled) "获取中…" else "未启用")
+        private set
 
     private var weatherCache = ""
     private var weatherAt = 0L
@@ -437,7 +443,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         arr.put(
             JSONObject().put("role", "system").put(
                 "content",
-                "【当前真实时间】" + Timetable.describe(courses) +
+                "【当前真实时间】" + Timetable.describe(if (timetableEnabled) courses else emptyList()) +
                     (if (gapLine.isNotEmpty()) " $gapLine" else "") +
                     " 硬性规则：任何涉及时间的判断（几点了、该吃饭没、该不该睡、离下课多久）" +
                     "一律以上面这句「现在是」为准，不许根据课程表、对话历史或上下文推测时间；" +
@@ -546,7 +552,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun updateWeatherEnabled(value: Boolean) {
         weatherEnabled = value
         settings.weatherEnabled = value
-        if (value) refreshWeather() else { weatherCache = ""; weatherAt = 0L }
+        if (value) {
+            weatherStatus = "获取中…"
+            refreshWeather()
+        } else {
+            weatherCache = ""
+            weatherAt = 0L
+            weatherStatus = "未启用"
+        }
     }
 
     fun updateCalendarEnabled(value: Boolean) {
@@ -554,14 +567,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         settings.calendarEnabled = value
     }
 
+    fun updateTimetableEnabled(value: Boolean) {
+        timetableEnabled = value
+        settings.timetableEnabled = value
+    }
+
+    fun updateAsrModel(value: String) {
+        asrModel = value.trim().ifBlank { "whisper-1" }
+        settings.asrModel = asrModel
+    }
+
     /** 定位 + 天气，失败就静默跳过，不影响对话。 */
     private fun refreshWeather() {
         val ctx = getApplication<Application>()
         viewModelScope.launch {
-            val loc = runCatching { LocationHelper.coarse(ctx) }.getOrNull() ?: return@launch
-            val text = runCatching { WeatherClient.summary(loc.first, loc.second) }.getOrNull() ?: return@launch
+            val loc = runCatching { LocationHelper.coarse(ctx) }.getOrNull()
+            if (loc == null) {
+                weatherStatus = "定位失败（室内 GPS 弱，可连 WiFi 再试）"
+                return@launch
+            }
+            val text = runCatching { WeatherClient.summary(loc.first, loc.second) }.getOrNull()
+            if (text == null) {
+                weatherStatus = "天气请求失败（网络不可达）"
+                return@launch
+            }
             weatherCache = text
             weatherAt = System.currentTimeMillis()
+            weatherStatus = "已更新"
         }
     }
 
@@ -707,7 +739,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             sttBusy = true
-            val result = runCatching { api.transcribe(provider.baseUrl, provider.apiKey, file) }
+            val result = runCatching { api.transcribe(provider.baseUrl, provider.apiKey, file, asrModel) }
             sttBusy = false
             runCatching { file.delete() }
             result.onSuccess { text ->

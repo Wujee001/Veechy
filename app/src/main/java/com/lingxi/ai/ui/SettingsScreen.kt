@@ -213,6 +213,25 @@ fun SettingsScreen(
                     steps = 11,
                     display = String.format("%.1fx", vm.tts.rate)
                 ) { vm.updateSpeechRate(it.toFloat()) }
+
+                Spacer(Modifier.height(12.dp))
+                Text("转写模型", style = MaterialTheme.typography.labelSmall, color = InkSoft)
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = vm.asrModel,
+                    onValueChange = vm::updateAsrModel,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("whisper-1", style = MaterialTheme.typography.bodySmall) },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = fieldColors()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "「录音转写」用的模型名，要填你服务商实际提供的，例如 whisper-1、qwen3-asr-flash",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkSoft
+                )
             }
 
             Spacer(Modifier.height(20.dp))
@@ -325,6 +344,15 @@ fun SettingsScreen(
                     )
                 }
 
+                if (vm.weatherEnabled) {
+                    Text(
+                        "状态：" + vm.weatherStatus,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = InkSoft,
+                        modifier = Modifier.padding(start = 2.dp, top = 4.dp)
+                    )
+                }
+
                 Spacer(Modifier.height(10.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -386,7 +414,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.7.0", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.7.1", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,

@@ -25,6 +25,8 @@ object Persona {
             appendLine("【你是谁】")
             appendLine(if (female) SISTER else BROTHER)
             appendLine()
+            appendLine("【语言】默认用简体中文回答；只有对方整段使用其他语言时才跟着换。")
+            appendLine()
             appendLine("【输出格式】")
             appendLine("每条回复先写一句内心独白，用〔〕包住，然后换行写正文，正文不要重复独白。")
             appendLine("独白是第一人称的即时反应，一两句，短，带情绪和态度；可以是不服气、看穿、按捺住的占有欲，")

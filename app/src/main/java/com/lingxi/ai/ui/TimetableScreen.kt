@@ -35,6 +35,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -96,6 +98,25 @@ fun TimetableScreen(vm: MainViewModel, onBack: () -> Unit) {
         ) {
 
             SoftCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("在对话中启用课表", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "关掉后只注入当前时间，不再带整周课表，可省 token",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Switch(
+                        checked = vm.timetableEnabled,
+                        onCheckedChange = vm::updateTimetableEnabled,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
                 Text("导入课表", style = MaterialTheme.typography.titleSmall, color = Ink)
                 Spacer(Modifier.height(4.dp))
                 Text(
