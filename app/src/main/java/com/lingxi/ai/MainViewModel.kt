@@ -11,6 +11,7 @@ import com.lingxi.ai.data.ChatMessage
 import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
 import com.lingxi.ai.data.InnerVoice
+import com.lingxi.ai.audio.TtsPlayer
 import com.lingxi.ai.data.Course
 import com.lingxi.ai.data.Persona
 import com.lingxi.ai.data.Provider
@@ -38,6 +39,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val chatStore = ChatStore(app)
     private val api = ApiClient()
 
+    val tts = TtsPlayer(app)
     val kb = KnowledgeStore(app)
 
     var kbDocs by mutableStateOf(kb.docs)
@@ -46,6 +48,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var kbEnabled by mutableStateOf(settings.kbEnabled)
         private set
+    var autoSpeak by mutableStateOf(settings.autoSpeak)
     var nightMode by mutableStateOf(settings.nightMode)
         private set
     var bookPreview by mutableStateOf<IsbnLookup.BookInfo?>(null)
@@ -102,6 +105,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     init {
+        tts.updateRate(settings.speechRate)
         val list = conversations
         if (list.isEmpty()) {
             createConversation()
@@ -166,6 +170,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         job?.cancel()
+        tts.shutdown()
         super.onCleared()
     }
 
@@ -291,12 +296,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stopGenerating() {
         job?.cancel()
+        tts.stop()
         job = null
         streaming = false
         current?.let { push(it) }
     }
 
-    fun send(text: String, imagePaths: List<String> = emptyList()) {
+    fun send(text: String, imagePaths: List<String> = emptyList(), speak: Boolean = false) {
         if (streaming) return
         val provider = activeProvider
         if (provider == null) {
@@ -358,6 +364,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 if (acc.isBlank()) {
                     patchLast { it.copy(text = "（模型没有返回内容）") }
+                } else if (speak || autoSpeak) {
+                    tts.speak(InnerVoice.bodyOnly(acc))
                 }
             } catch (e: CancellationException) {
                 if (acc.isNotBlank()) patchLast { it.copy(text = acc) }
@@ -500,6 +508,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         kb.remove(id)
         kbDocs = kb.docs
         status = "已从知识库删除"
+    }
+
+    fun updateAutoSpeak(v: Boolean) {
+        autoSpeak = v
+        settings.autoSpeak = v
+    }
+
+    fun updateSpeechRate(v: Float) {
+        settings.speechRate = v
+        tts.updateRate(v)
     }
 
     fun updateNightMode(value: Boolean) {
@@ -648,7 +666,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             sttBusy = false
             runCatching { file.delete() }
             result.onSuccess { text ->
-                if (text.isBlank()) status = "没听清，再说一次" else send(text, listOfNotNull(imagePath))
+                if (text.isBlank()) status = "没听清，再说一次" else send(text, listOfNotNull(imagePath), speak = true)
             }.onFailure {
                 status = "转写失败：${it.message}（当前服务可能不支持 /audio/transcriptions，可换回系统识别）"
             }

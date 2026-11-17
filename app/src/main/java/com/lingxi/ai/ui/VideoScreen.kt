@@ -85,7 +85,7 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     capturing = true
                     val file = camera.snap()
                     capturing = false
-                    vm.send(heard, listOfNotNull(file?.absolutePath))
+                    vm.send(heard, listOfNotNull(file?.absolutePath), speak = true)
                 }
             }
         }
@@ -135,6 +135,11 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = InkSoft
                 )
+            }
+            if (vm.tts.speaking) {
+                IconButton({ vm.tts.stop() }) {
+                    Icon(Icons.Rounded.VolumeOff, "停止朗读", tint = Purple)
+                }
             }
             IconButton(onOpenSettings) {
                 Icon(Icons.Rounded.Settings, "设置", tint = InkSoft)
@@ -255,7 +260,7 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                         capturing = true
                         val f = camera.snap()
                         capturing = false
-                        vm.send("描述你看到的画面，用简短几句话。", listOfNotNull(f?.absolutePath))
+                        vm.send("描述你看到的画面，用简短几句话。", listOfNotNull(f?.absolutePath), speak = true)
                     }
                 }
             }

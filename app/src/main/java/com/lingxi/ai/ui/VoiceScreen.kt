@@ -81,7 +81,7 @@ fun VoiceScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
 
     LaunchedEffect(Unit) {
         speech.autoRestart = true
-        speech.onFinal = { heard -> vm.send(heard) }
+        speech.onFinal = { heard -> vm.send(heard, speak = true) }
     }
     DisposableEffect(Unit) {
         onDispose {
@@ -122,6 +122,11 @@ fun VoiceScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = InkSoft
                 )
+            }
+            if (vm.tts.speaking) {
+                IconButton({ vm.tts.stop() }) {
+                    Icon(Icons.Rounded.VolumeOff, "停止朗读", tint = Purple)
+                }
             }
             IconButton(onOpenSettings) {
                 Icon(Icons.Rounded.Settings, "设置", tint = InkSoft)
@@ -170,6 +175,7 @@ fun VoiceScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 when {
                     vm.sttBusy -> "转写中"
                     vm.streaming -> "正在想…"
+                    vm.tts.speaking -> "正在说…"
                     active -> "请讲"
                     else -> "待机"
                 },

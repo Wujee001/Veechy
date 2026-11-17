@@ -183,6 +183,37 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+            SectionTitle("语音")
+            SoftCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("自动朗读回复", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "语音 / 视觉对话中总是朗读",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Switch(
+                        checked = vm.autoSpeak,
+                        onCheckedChange = vm::updateAutoSpeak,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                SliderRow(
+                    label = "语速",
+                    value = vm.tts.rate.toDouble(),
+                    range = 0.6..1.8,
+                    steps = 11,
+                    display = String.format("%.1fx", vm.tts.rate)
+                ) { vm.updateSpeechRate(it.toFloat()) }
+            }
+
+            Spacer(Modifier.height(20.dp))
             SectionTitle("知识库")
             SoftCard {
                 Row(
@@ -273,7 +304,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.6.1", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.6.2", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
