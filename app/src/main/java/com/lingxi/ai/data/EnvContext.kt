@@ -19,7 +19,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -30,10 +29,68 @@ object LocationHelper {
 
     @SuppressLint("MissingPermission")
     suspend fun coarse(context: Context): Pair<Double, Double>? {
-        if (!has(context, Manifest.permission.ACCESS_COARSE_LOCATION)) return null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) return null
+
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
 
         // 先用系统缓存，通常立刻拿到
+        runCatching {
+            lm.getProviders(true).forEach { p ->
+                val loc = lm.getLastKnownLocation(p)
+                if (loc != null) return loc.latitude to loc.longitude
+            }
+        }
+
+        return runCatching {
+            suspendCancellableCoroutine<Pair<Double, Double>?> { cont ->
+                val provider = when {
+                    lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+                    lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+                    else -> null
+                }
+                if (provider == null) {
+                    cont.resume(null)
+                    return@suspendCancellableCoroutine
+                }
+
+                val handler = Handler(Looper.getMainLooper())
+                val listener = object : LocationListener {
+                    override fun onLocationChanged(location: Location) {
+                        if (cont.isActive) cont.resume(location.latitude to location.longitude)
+                    }
+
+                    override fun onProviderEnabled(provider: String) {}
+                    override fun onProviderDisabled(provider: String) {}
+                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                }
+
+                runCatching { lm.requestSingleUpdate(provider, listener, Looper.getMainLooper()) }
+                handler.postDelayed({
+                    runCatching { lm.removeUpdates(listener) }
+                    if (cont.isActive) cont.resume(null)
+                }, 6000)
+            }
+        }.getOrNull()
+    }
+}
+
+/** Open-Meteo：免费、不需要 key。 */
+object WeatherClient {
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    suspend fun summary(lat: Double, lon: Double): String? = withContext(Dispatchers.IO) {
+        val url = "https://api.open-meteo.com/v1/forecast" +
+            "?latitude=" + String.format(Locale.US, "%.3f", lat) +
+            "&longitude=" + String.format(Locale.US, "%.3f", lon) +
+            "&hourly=temperature_2m,precipitation_probability" +
+            "&forecast_days=2&timezone=auto"
+
         runCatching {
             client.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
@@ -75,7 +132,8 @@ object LocationHelper {
                         append("未来 8 小时无雨；")
                     }
                     if (minT != Double.MAX_VALUE) {
-                        append("这 8 小时 ").append(minT.toInt()).append('~').append(maxT.toInt()).append("℃。")
+                        append("这 8 小时 ").append(minT.toInt()).append('~')
+                            .append(maxT.toInt()).append("℃。")
                     }
                 }.trim().ifBlank { null }
             }
@@ -135,10 +193,5 @@ object CalendarHelper {
         }
 
         return items.joinToString("；")
-    }
-
-    fun todayLabel(): String {
-        val c = Calendar.getInstance()
-        return "${c.get(Calendar.MONTH) + 1}月${c.get(Calendar.DAY_OF_MONTH)}日"
     }
 }
