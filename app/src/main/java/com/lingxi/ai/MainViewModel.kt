@@ -703,6 +703,92 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         bookPreview = null
     }
 
+    // ------------------------------------------------------------ 课表
+
+    fun updateTimetableRules(v: String) {
+        timetableRules = v
+        settings.timetableRules = v
+    }
+
+    fun clearTimetable() {
+        courses = emptyList()
+        settings.timetableJson = ""
+        status = "课表已清空"
+    }
+
+    fun parseTimetable(imagePath: String?) {
+        val provider = activeProvider
+        if (provider == null) {
+            status = "请先在设置里添加 API 供应商"
+            return
+        }
+        if (provider.apiKey.isBlank()) {
+            status = "API Key 未填写"
+            return
+        }
+        val model = activeModelId ?: provider.models.firstOrNull()?.id
+        if (model.isNullOrBlank()) {
+            status = "请先同步并选择模型"
+            return
+        }
+        if (imagePath == null && timetableRules.isBlank()) {
+            status = "请先选择课表截图"
+            return
+        }
+        if (ttBusy) return
+
+        viewModelScope.launch {
+            ttBusy = true
+            val result = runCatching {
+                val messages = timetableMessages(imagePath)
+                val raw = api.streamChat(
+                    base = provider.baseUrl,
+                    key = provider.apiKey,
+                    model = model,
+                    messages = messages,
+                    temperature = 0.1,
+                    onDelta = {}
+                )
+                Timetable.parse(raw)
+            }
+            ttBusy = false
+            result.onSuccess { list ->
+                courses = list
+                settings.timetableJson = Timetable.encode(list)
+                status = "课表已保存：${list.size} 节课"
+            }.onFailure {
+                status = "课表解析失败：${it.message}（需要选一个支持图片的模型）"
+            }
+        }
+    }
+
+    private fun timetableMessages(imagePath: String?): JSONArray {
+        val arr = JSONArray()
+        arr.put(JSONObject().put("role", "system").put("content", TT_PROMPT))
+
+        val parts = JSONArray()
+        val text = buildString {
+            append("请解析这张课表。")
+            if (timetableRules.isNotBlank()) {
+                append("\n\n补充规则：\n")
+                append(timetableRules)
+            }
+        }
+        parts.put(JSONObject().put("type", "text").put("text", text))
+
+        imagePath?.let { path ->
+            val f = File(path)
+            if (f.exists()) {
+                parts.put(
+                    JSONObject().put("type", "image_url")
+                        .put("image_url", JSONObject().put("url", MediaUtil.toDataUrl(f)))
+                )
+            }
+        }
+        arr.put(JSONObject().put("role", "user").put("content", parts))
+        return arr
+    }
+
     // ------------------------------------------------------------ 设置写入
 
     fun updateTemperature(v: Float) {
