@@ -50,6 +50,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.lingxi.ai.MainViewModel
 import com.lingxi.ai.audio.SpeechInput
+import com.lingxi.ai.audio.VoiceRecorder
 import com.lingxi.ai.camera.CameraController
 import com.lingxi.ai.ui.theme.Blue
 import com.lingxi.ai.ui.theme.Ink
@@ -69,8 +70,11 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
 
     val speech = remember { SpeechInput(context) }
     val camera = remember { CameraController(context, lifecycleOwner) }
+    val recorder = remember { VoiceRecorder(context) }
     var useFront by remember { mutableStateOf(false) }
-    var enabled by remember { mutableStateOf(true) }
+    var recording by remember { mutableStateOf(false) }
+    // 系统识别不可用时默认不启动，改用录音转写
+    var enabled by remember { mutableStateOf(speech.available) }
     var capturing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -81,7 +85,7 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     capturing = true
                     val file = camera.snap()
                     capturing = false
-                    vm.send(heard, listOfNotNull(file?.absolutePath), speak = true)
+                    vm.send(heard, listOfNotNull(file?.absolutePath))
                 }
             }
         }
@@ -110,6 +114,7 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     DisposableEffect(Unit) {
         onDispose {
             speech.destroy()
+            recorder.cancel()
             camera.unbind()
         }
     }
@@ -130,11 +135,6 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = InkSoft
                 )
-            }
-            if (vm.tts.speaking) {
-                IconButton({ vm.tts.stop() }) {
-                    Icon(Icons.Rounded.VolumeOff, "停止朗读", tint = Purple)
-                }
             }
             IconButton(onOpenSettings) {
                 Icon(Icons.Rounded.Settings, "设置", tint = InkSoft)
@@ -255,7 +255,7 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                         capturing = true
                         val f = camera.snap()
                         capturing = false
-                        vm.send("描述你看到的画面，用简短几句话。", listOfNotNull(f?.absolutePath), speak = true)
+                        vm.send("描述你看到的画面，用简短几句话。", listOfNotNull(f?.absolutePath))
                     }
                 }
             }
@@ -265,27 +265,46 @@ fun VideoScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     .size(70.dp)
                     .clip(CircleShape)
                     .background(
-                        if (enabled) Brush.linearGradient(listOf(Color(0xFFE5484D), Color(0xFFFF7A7E)))
+                        if (enabled || recording) Brush.linearGradient(listOf(Color(0xFFE5484D), Color(0xFFFF7A7E)))
                         else Brush.linearGradient(listOf(Purple, Blue))
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 IconButton(
                     onClick = {
-                        if (!micGranted) askMic() else enabled = !enabled
+                        when {
+                            !micGranted -> askMic()
+                            !speech.available -> {
+                                if (recording) {
+                                    recording = false
+                                    val f = recorder.stop()
+                                    if (f != null) {
+                                        scope.launch {
+                                            capturing = true
+                                            val frame = camera.snap()
+                                            capturing = false
+                                            vm.transcribeAndSend(f, frame?.absolutePath)
+                                        }
+                                    }
+                                } else {
+                                    recording = recorder.start()
+                                    enabled = false
+                                }
+                            }
+                            else -> enabled = !enabled
+                        }
                     },
                     modifier = Modifier.size(70.dp)
                 ) {
                     Icon(
-                        if (enabled) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                        if (enabled || recording) Icons.Rounded.Stop else Icons.Rounded.Mic,
                         contentDescription = "麦克风",
                         tint = Color.White,
                         modifier = Modifier.size(30.dp)
                     )
                 }
             }
-            Spacer(Modifier.width(28.dp))
-            SmallCircle(icon = Icons.Rounded.VolumeOff, label = "静音") { vm.tts.stop() }
+
         }
     }
 }

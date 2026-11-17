@@ -65,10 +65,23 @@ fun VoiceScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     // 0 = 系统识别，1 = 录音转写
     var mode by remember { mutableStateOf(if (speech.available) 0 else 1) }
     var enabled by remember { mutableStateOf(false) }
+    var failStreak by remember { mutableStateOf(0) }
+
+    // 系统识别连续失败三次就自动切到录音转写
+    LaunchedEffect(speech.errorText) {
+        if (mode == 0 && !speech.errorText.isNullOrBlank()) {
+            failStreak += 1
+            if (failStreak >= 3) {
+                mode = 1
+                failStreak = 0
+                vm.say("系统识别连续失败，已切到「录音转写」")
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         speech.autoRestart = true
-        speech.onFinal = { heard -> vm.send(heard, speak = true) }
+        speech.onFinal = { heard -> vm.send(heard) }
     }
     DisposableEffect(Unit) {
         onDispose {
@@ -110,11 +123,6 @@ fun VoiceScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                     color = InkSoft
                 )
             }
-            if (vm.tts.speaking) {
-                IconButton({ vm.tts.stop() }) {
-                    Icon(Icons.Rounded.VolumeOff, "停止朗读", tint = Purple)
-                }
-            }
             IconButton(onOpenSettings) {
                 Icon(Icons.Rounded.Settings, "设置", tint = InkSoft)
             }
@@ -132,6 +140,14 @@ fun VoiceScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             ModeChip("系统识别", mode == 0) { mode = 0 }
             ModeChip("录音转写", mode == 1) { mode = 1 }
         }
+
+        Text(
+            "系统识别：" + (if (speech.available) "可用" else "不可用") +
+                (speech.errorText?.let { " · 最近错误：$it" } ?: ""),
+            style = MaterialTheme.typography.labelSmall,
+            color = InkSoft.copy(alpha = 0.85f),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+        )
 
         if (!speech.available && mode == 0) {
             Text(
@@ -154,7 +170,6 @@ fun VoiceScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 when {
                     vm.sttBusy -> "转写中"
                     vm.streaming -> "正在想…"
-                    vm.tts.speaking -> "正在说…"
                     active -> "请讲"
                     else -> "待机"
                 },

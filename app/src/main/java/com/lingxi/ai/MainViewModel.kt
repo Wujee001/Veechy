@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.lingxi.ai.audio.TtsPlayer
 import com.lingxi.ai.data.ChatMessage
 import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
@@ -39,7 +38,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val chatStore = ChatStore(app)
     private val api = ApiClient()
 
-    val tts = TtsPlayer(app)
     val kb = KnowledgeStore(app)
 
     var kbDocs by mutableStateOf(kb.docs)
@@ -73,7 +71,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var temperature by mutableStateOf(settings.temperature)
     var systemPrompt by mutableStateOf(settings.systemPrompt)
     var contextTurns by mutableStateOf(settings.contextTurns)
-    var autoSpeak by mutableStateOf(settings.autoSpeak)
 
     var conversations by mutableStateOf(chatStore.list())
         private set
@@ -105,7 +102,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     init {
-        tts.updateRate(settings.speechRate)
         val list = conversations
         if (list.isEmpty()) {
             createConversation()
@@ -170,7 +166,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         job?.cancel()
-        tts.shutdown()
         super.onCleared()
     }
 
@@ -298,11 +293,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         job?.cancel()
         job = null
         streaming = false
-        tts.stop()
         current?.let { push(it) }
     }
 
-    fun send(text: String, imagePaths: List<String> = emptyList(), speak: Boolean = false) {
+    fun send(text: String, imagePaths: List<String> = emptyList()) {
         if (streaming) return
         val provider = activeProvider
         if (provider == null) {
@@ -364,9 +358,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 if (acc.isBlank()) {
                     patchLast { it.copy(text = "（模型没有返回内容）") }
-                } else if (speak || autoSpeak) {
-                    // 朗读只念正文，跳过心理活动
-                    tts.speak(InnerVoice.bodyOnly(acc))
                 }
             } catch (e: CancellationException) {
                 if (acc.isNotBlank()) patchLast { it.copy(text = acc) }
@@ -402,13 +393,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         kbHits: List<KbHit> = emptyList()
     ): JSONArray {
         val arr = JSONArray()
-        // 用户自己在设置里写的提示词优先
-        if (system.isNotBlank()) {
-            arr.put(JSONObject().put("role", "system").put("content", system))
-        }
-        // 隐藏人设：只在请求里注入，界面上不暴露
-        arr.put(JSONObject().put("role", "system").put("content", Persona.block(settings.gender)))
-        // 真实时间与课表，供自然带出，不要求逐条播报
+        // 现实信息放最前：模型对最早的 system 指令最敏感，时间判断必须以此为准
         val prev = history.dropLast(1).lastOrNull()
         val gap = if (prev != null) System.currentTimeMillis() - prev.time else 0L
         val gapLine = when {
@@ -421,15 +406,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         arr.put(
             JSONObject().put("role", "system").put(
                 "content",
-                "【现实信息】" + Timetable.describe(courses) +
+                "【当前真实时间】" + Timetable.describe(courses) +
                     (if (gapLine.isNotEmpty()) " $gapLine" else "") +
-                    " 以上时间来自设备实时时钟，优先于对话历史里出现的任何时间说法；" +
+                    " 硬性规则：任何涉及时间的判断（几点了、该吃饭没、该不该睡、离下课多久）" +
+                    "一律以上面这句「现在是」为准，不许根据课程表、对话历史或上下文推测时间；" +
+                    "用户说的时间和它对不上时，按设备时间纠正。" +
                     "如果上一轮是很久以前，不要把它当成同一天。" +
                     "问到某天上什么课，直接按上面的完整课表回答；" +
                     "其他时候需要就自然带出来（比如提醒上课、问一句吃没吃），" +
                     "不要像播报一样逐条念，也不要每句话都提时间。"
             )
         )
+        // 用户自己在设置里写的提示词优先
+        if (system.isNotBlank()) {
+            arr.put(JSONObject().put("role", "system").put("content", system))
+        }
+        // 隐藏人设：只在请求里注入，界面上不暴露
+        arr.put(JSONObject().put("role", "system").put("content", Persona.block(settings.gender)))
         if (kbHits.isNotEmpty()) {
             val ctx = kbHits.joinToString("\n\n") { "[资料 · ${it.docName}]\n${it.text}" }
             arr.put(
@@ -637,7 +630,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     /** 录音文件走服务端 /audio/transcriptions 转写后直接发送。 */
-    fun transcribeAndSend(file: File) {
+    fun transcribeAndSend(file: File, imagePath: String? = null) {
         val provider = activeProvider
         if (provider == null) {
             status = "请先在设置里添加 API 供应商"
@@ -655,7 +648,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             sttBusy = false
             runCatching { file.delete() }
             result.onSuccess { text ->
-                if (text.isBlank()) status = "没听清，再说一次" else send(text, speak = true)
+                if (text.isBlank()) status = "没听清，再说一次" else send(text, listOfNotNull(imagePath))
             }.onFailure {
                 status = "转写失败：${it.message}（当前服务可能不支持 /audio/transcriptions，可换回系统识别）"
             }
@@ -763,16 +756,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun updateContextTurns(v: Int) {
         contextTurns = v
         settings.contextTurns = v
-    }
-
-    fun updateAutoSpeak(v: Boolean) {
-        autoSpeak = v
-        settings.autoSpeak = v
-    }
-
-    fun updateSpeechRate(v: Float) {
-        settings.speechRate = v
-        tts.updateRate(v)
     }
 
     private companion object {
