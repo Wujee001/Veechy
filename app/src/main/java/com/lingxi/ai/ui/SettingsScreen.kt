@@ -2,6 +2,7 @@
 
 package com.lingxi.ai.ui
 
+import android.Manifest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +56,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -275,6 +277,86 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+            SectionTitle("真实数据")
+            SoftCard {
+                val (locOk, askLoc) = rememberPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                val (calOk, askCal) = rememberPermission(Manifest.permission.READ_CALENDAR)
+                var pendingWeather by remember { mutableStateOf(false) }
+                var pendingCalendar by remember { mutableStateOf(false) }
+
+                LaunchedEffect(locOk) {
+                    if (locOk && pendingWeather) {
+                        vm.updateWeatherEnabled(true)
+                        pendingWeather = false
+                    }
+                }
+                LaunchedEffect(calOk) {
+                    if (calOk && pendingCalendar) {
+                        vm.updateCalendarEnabled(true)
+                        pendingCalendar = false
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("天气", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "按定位查实时气温与降水，Open-Meteo 免密钥",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Switch(
+                        checked = vm.weatherEnabled,
+                        onCheckedChange = { on ->
+                            when {
+                                !on -> vm.updateWeatherEnabled(false)
+                                locOk -> vm.updateWeatherEnabled(true)
+                                else -> {
+                                    pendingWeather = true
+                                    askLoc()
+                                }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("日程", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "读取系统日历里未来两天的安排",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Switch(
+                        checked = vm.calendarEnabled,
+                        onCheckedChange = { on ->
+                            when {
+                                !on -> vm.updateCalendarEnabled(false)
+                                calOk -> vm.updateCalendarEnabled(true)
+                                else -> {
+                                    pendingCalendar = true
+                                    askCal()
+                                }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
             SectionTitle("显示")
             SoftCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -304,7 +386,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.6.2", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.7.0", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,

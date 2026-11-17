@@ -51,6 +51,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var autoSpeak by mutableStateOf(settings.autoSpeak)
     var nightMode by mutableStateOf(settings.nightMode)
         private set
+    var weatherEnabled by mutableStateOf(settings.weatherEnabled)
+        private set
+    var calendarEnabled by mutableStateOf(settings.calendarEnabled)
+        private set
+
+    private var weatherCache = ""
+    private var weatherAt = 0L
     var bookPreview by mutableStateOf<IsbnLookup.BookInfo?>(null)
         private set
 
@@ -106,6 +113,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         tts.updateRate(settings.speechRate)
+        if (weatherEnabled) refreshWeather()
         val list = conversations
         if (list.isEmpty()) {
             createConversation()
@@ -394,6 +402,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         current = c.copy(messages = list, updatedAt = System.currentTimeMillis())
     }
 
+    private fun envLine(): String = buildString {
+        if (weatherEnabled && weatherCache.isNotBlank() &&
+            System.currentTimeMillis() - weatherAt < 60 * 60_000L
+        ) {
+            append(" 天气：").append(weatherCache)
+        }
+        if (calendarEnabled) {
+            val c = runCatching { CalendarHelper.upcoming(getApplication()) }.getOrDefault("")
+            if (c.isNotBlank()) append(" 接下来两天的日程：").append(c)
+        }
+    }
+
     private fun buildPayload(
         history: List<ChatMessage>,
         system: String,
@@ -518,6 +538,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun updateSpeechRate(v: Float) {
         settings.speechRate = v
         tts.updateRate(v)
+    }
+
+    fun updateWeatherEnabled(value: Boolean) {
+        weatherEnabled = value
+        settings.weatherEnabled = value
+        if (value) refreshWeather() else { weatherCache = ""; weatherAt = 0L }
+    }
+
+    fun updateCalendarEnabled(value: Boolean) {
+        calendarEnabled = value
+        settings.calendarEnabled = value
+    }
+
+    /** 定位 + 天气，失败就静默跳过，不影响对话。 */
+    private fun refreshWeather() {
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            val loc = runCatching { LocationHelper.coarse(ctx) }.getOrNull() ?: return@launch
+            val text = runCatching { WeatherClient.summary(loc.first, loc.second) }.getOrNull() ?: return@launch
+            weatherCache = text
+            weatherAt = System.currentTimeMillis()
+        }
     }
 
     fun updateNightMode(value: Boolean) {

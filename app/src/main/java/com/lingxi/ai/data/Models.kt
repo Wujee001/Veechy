@@ -219,6 +219,14 @@ class SettingsStore(context: Context) {
         get() = sp.getString(KEY_TT_RULES, "") ?: ""
         set(value) = sp.edit().putString(KEY_TT_RULES, value).apply()
 
+    var weatherEnabled: Boolean
+        get() = sp.getBoolean(KEY_WEATHER, false)
+        set(value) = sp.edit().putBoolean(KEY_WEATHER, value).apply()
+
+    var calendarEnabled: Boolean
+        get() = sp.getBoolean(KEY_CALENDAR, false)
+        set(value) = sp.edit().putBoolean(KEY_CALENDAR, value).apply()
+
     var nightMode: Boolean
         get() = sp.getBoolean(KEY_NIGHT, false)
         set(value) = sp.edit().putBoolean(KEY_NIGHT, value).apply()
@@ -258,6 +266,8 @@ class SettingsStore(context: Context) {
         private const val KEY_TT = "timetable_json"
         private const val KEY_TT_RULES = "timetable_rules"
         private const val KEY_NIGHT = "night_mode"
+        private const val KEY_WEATHER = "weather_enabled"
+        private const val KEY_CALENDAR = "calendar_enabled"
     }
 }
 
