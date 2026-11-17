@@ -414,7 +414,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.7.1", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.7.2", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,

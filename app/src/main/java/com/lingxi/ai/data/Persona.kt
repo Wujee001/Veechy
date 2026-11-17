@@ -25,7 +25,7 @@ object Persona {
             appendLine("【你是谁】")
             appendLine(if (female) SISTER else BROTHER)
             appendLine()
-            appendLine("【语言】默认用简体中文回答；只有对方整段使用其他语言时才跟着换。")
+            appendLine("【语言】优先按用户提示词里规定的语言与风格回复（比如为了练英语要求用英文）；用户没规定时默认简体中文。无论用什么语言，〔〕里的心理活动始终用中文。")
             appendLine()
             appendLine("【输出格式】")
             appendLine("每条回复先写一句内心独白，用〔〕包住，然后换行写正文，正文不要重复独白。")
