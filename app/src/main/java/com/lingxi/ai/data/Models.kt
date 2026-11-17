@@ -223,14 +223,6 @@ class SettingsStore(context: Context) {
         get() = sp.getBoolean(KEY_WEATHER, false)
         set(value) = sp.edit().putBoolean(KEY_WEATHER, value).apply()
 
-    var calendarEnabled: Boolean
-        get() = sp.getBoolean(KEY_CALENDAR, false)
-        set(value) = sp.edit().putBoolean(KEY_CALENDAR, value).apply()
-
-    var asrModel: String
-        get() = sp.getString(KEY_ASR_MODEL, "whisper-1") ?: "whisper-1"
-        set(value) = sp.edit().putString(KEY_ASR_MODEL, value).apply()
-
     var timetableEnabled: Boolean
         get() = sp.getBoolean(KEY_TT_ON, true)
         set(value) = sp.edit().putBoolean(KEY_TT_ON, value).apply()
@@ -274,10 +266,8 @@ class SettingsStore(context: Context) {
         private const val KEY_TT = "timetable_json"
         private const val KEY_TT_RULES = "timetable_rules"
         private const val KEY_NIGHT = "night_mode"
-        private const val KEY_ASR_MODEL = "asr_model"
         private const val KEY_TT_ON = "timetable_enabled"
         private const val KEY_WEATHER = "weather_enabled"
-        private const val KEY_CALENDAR = "calendar_enabled"
     }
 }
 

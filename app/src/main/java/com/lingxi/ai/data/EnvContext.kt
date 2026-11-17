@@ -10,7 +10,6 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -18,8 +17,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
@@ -76,7 +73,10 @@ object LocationHelper {
     }
 }
 
-/** Open-Meteo：免费、不需要 key。 */
+/**
+ * Open-Meteo 当前天气。免费、不需要 key。
+ * 用 current 接口（已在设备上验证可达），不再请求 hourly。
+ */
 object WeatherClient {
 
     private val client = OkHttpClient.Builder()
@@ -84,114 +84,41 @@ object WeatherClient {
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
+    private val CODES = mapOf(
+        0 to "晴", 1 to "大致晴朗", 2 to "多云", 3 to "阴",
+        45 to "有雾", 48 to "雾凇",
+        51 to "小毛毛雨", 53 to "毛毛雨", 55 to "大毛毛雨",
+        61 to "小雨", 63 to "中雨", 65 to "大雨",
+        66 to "冻雨", 67 to "强冻雨",
+        71 to "小雪", 73 to "中雪", 75 to "大雪", 77 to "雪粒",
+        80 to "阵雨", 81 to "强阵雨", 82 to "暴雨",
+        85 to "阵雪", 86 to "强阵雪",
+        95 to "雷阵雨", 96 to "雷阵雨伴冰雹", 99 to "强雷雨伴冰雹"
+    )
+
     suspend fun summary(lat: Double, lon: Double): String? = withContext(Dispatchers.IO) {
         val url = "https://api.open-meteo.com/v1/forecast" +
             "?latitude=" + String.format(Locale.US, "%.3f", lat) +
             "&longitude=" + String.format(Locale.US, "%.3f", lon) +
-            "&hourly=temperature_2m,precipitation_probability" +
-            "&forecast_days=2&timezone=auto"
+            "&current=temperature_2m,weather_code&timezone=auto"
 
         runCatching {
             client.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
                 val body = resp.body?.string() ?: return@use null
-                val hourly = JSONObject(body).optJSONObject("hourly") ?: return@use null
-                val times = hourly.optJSONArray("time") ?: return@use null
-                val temps = hourly.optJSONArray("temperature_2m") ?: return@use null
-                val precs = hourly.optJSONArray("precipitation_probability")
+                val current = JSONObject(body).optJSONObject("current") ?: return@use null
 
-                val nowHour = SimpleDateFormat("yyyy-MM-dd'T'HH:00", Locale.US).format(Date())
-                var idx = 0
-                for (i in 0 until times.length()) {
-                    if (times.optString(i) == nowHour) {
-                        idx = i
-                        break
-                    }
-                }
+                val temp = current.optDouble("temperature_2m", Double.NaN)
+                val code = current.optInt("weather_code", -1)
+                val desc = CODES[code].orEmpty()
 
-                val cur = temps.optDouble(idx, Double.NaN)
-                var maxPrecip = 0
-                var minT = Double.MAX_VALUE
-                var maxT = -Double.MAX_VALUE
-                val end = minOf(idx + 8, times.length())
-                for (i in idx until end) {
-                    val pr = if (precs == null) 0 else precs.optInt(i, 0)
-                    if (pr > maxPrecip) maxPrecip = pr
-                    val t = temps.optDouble(i, Double.NaN)
-                    if (!t.isNaN()) {
-                        if (t < minT) minT = t
-                        if (t > maxT) maxT = t
-                    }
-                }
+                val text = buildString {
+                    if (desc.isNotBlank()) append(desc).append('，')
+                    if (!temp.isNaN()) append("气温 ").append(temp.toInt()).append("℃")
+                }.trim().trimEnd('，')
 
-                buildString {
-                    if (!cur.isNaN()) append("气温 ").append(cur.toInt()).append("℃；")
-                    if (maxPrecip >= 40) {
-                        append("未来 8 小时可能下雨（降水概率最高 ").append(maxPrecip).append("%）；")
-                    } else {
-                        append("未来 8 小时无雨；")
-                    }
-                    if (minT != Double.MAX_VALUE) {
-                        append("这 8 小时 ").append(minT.toInt()).append('~')
-                            .append(maxT.toInt()).append("℃。")
-                    }
-                }.trim().ifBlank { null }
+                text.ifBlank { null }
             }
         }.getOrNull()
-    }
-}
-
-/** 系统日历：读未来 48 小时的日程。 */
-object CalendarHelper {
-
-    fun upcoming(context: Context, limit: Int = 6): String {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR)
-            != PackageManager.PERMISSION_GRANTED
-        ) return ""
-
-        val start = System.currentTimeMillis()
-        val end = start + 48 * 3600_000L
-        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
-            .appendPath(start.toString())
-            .appendPath(end.toString())
-            .build()
-
-        val projection = arrayOf(
-            CalendarContract.Instances.TITLE,
-            CalendarContract.Instances.BEGIN,
-            CalendarContract.Instances.EVENT_LOCATION,
-            CalendarContract.Instances.ALL_DAY
-        )
-
-        val items = ArrayList<String>()
-        runCatching {
-            context.contentResolver.query(
-                uri,
-                projection,
-                null,
-                null,
-                CalendarContract.Instances.BEGIN + " ASC"
-            )?.use { c ->
-                val iTitle = c.getColumnIndex(CalendarContract.Instances.TITLE)
-                val iBegin = c.getColumnIndex(CalendarContract.Instances.BEGIN)
-                val iLoc = c.getColumnIndex(CalendarContract.Instances.EVENT_LOCATION)
-                val iAllDay = c.getColumnIndex(CalendarContract.Instances.ALL_DAY)
-                while (c.moveToNext() && items.size < limit) {
-                    val title = c.getString(iTitle)?.trim().orEmpty()
-                    if (title.isBlank()) continue
-                    val begin = c.getLong(iBegin)
-                    val allDay = iAllDay >= 0 && c.getInt(iAllDay) == 1
-                    val loc = if (iLoc >= 0) c.getString(iLoc)?.trim().orEmpty() else ""
-                    val whenText = if (allDay) {
-                        SimpleDateFormat("MM-dd 全天", Locale.getDefault()).format(Date(begin))
-                    } else {
-                        SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(begin))
-                    }
-                    items.add(whenText + " " + title + if (loc.isNotBlank()) "@$loc" else "")
-                }
-            }
-        }
-
-        return items.joinToString("；")
     }
 }

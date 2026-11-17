@@ -214,24 +214,6 @@ fun SettingsScreen(
                     display = String.format("%.1fx", vm.tts.rate)
                 ) { vm.updateSpeechRate(it.toFloat()) }
 
-                Spacer(Modifier.height(12.dp))
-                Text("转写模型", style = MaterialTheme.typography.labelSmall, color = InkSoft)
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = vm.asrModel,
-                    onValueChange = vm::updateAsrModel,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("whisper-1", style = MaterialTheme.typography.bodySmall) },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = fieldColors()
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "「录音转写」用的模型名，要填你服务商实际提供的，例如 whisper-1、qwen3-asr-flash",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = InkSoft
-                )
             }
 
             Spacer(Modifier.height(20.dp))
@@ -299,20 +281,12 @@ fun SettingsScreen(
             SectionTitle("真实数据")
             SoftCard {
                 val (locOk, askLoc) = rememberPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
-                val (calOk, askCal) = rememberPermission(Manifest.permission.READ_CALENDAR)
                 var pendingWeather by remember { mutableStateOf(false) }
-                var pendingCalendar by remember { mutableStateOf(false) }
 
                 LaunchedEffect(locOk) {
                     if (locOk && pendingWeather) {
                         vm.updateWeatherEnabled(true)
                         pendingWeather = false
-                    }
-                }
-                LaunchedEffect(calOk) {
-                    if (calOk && pendingCalendar) {
-                        vm.updateCalendarEnabled(true)
-                        pendingCalendar = false
                     }
                 }
 
@@ -353,35 +327,6 @@ fun SettingsScreen(
                     )
                 }
 
-                Spacer(Modifier.height(10.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("日程", style = MaterialTheme.typography.bodyMedium, color = Ink)
-                        Text(
-                            "读取系统日历里未来两天的安排",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = InkSoft
-                        )
-                    }
-                    Switch(
-                        checked = vm.calendarEnabled,
-                        onCheckedChange = { on ->
-                            when {
-                                !on -> vm.updateCalendarEnabled(false)
-                                calOk -> vm.updateCalendarEnabled(true)
-                                else -> {
-                                    pendingCalendar = true
-                                    askCal()
-                                }
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Purple
-                        )
-                    )
-                }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -414,7 +359,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.7.2", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.8.0", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,

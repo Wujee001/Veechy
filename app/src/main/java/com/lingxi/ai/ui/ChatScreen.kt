@@ -392,19 +392,6 @@ private fun InputBar(
 ) {
     val ctx = LocalContext.current
     var text by remember { mutableStateOf("") }
-    val (micGranted, askMic) = rememberPermission(MicPermission)
-    val speech = remember { com.lingxi.ai.audio.SpeechInput(ctx) }
-
-    LaunchedEffect(Unit) {
-        speech.autoRestart = false
-        speech.onFinal = { heard ->
-            text = if (text.isBlank()) heard else "$text $heard"
-        }
-    }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose { speech.destroy() }
-    }
-
     Column(
         Modifier
             .fillMaxWidth()
@@ -462,7 +449,7 @@ private fun InputBar(
                 modifier = Modifier.weight(1f).heightIn(min = 46.dp, max = 140.dp),
                 placeholder = {
                     Text(
-                        if (speech.listening) "正在听…" else "发消息…",
+                        "发消息…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = InkSoft.copy(alpha = 0.7f)
                     )
@@ -480,19 +467,6 @@ private fun InputBar(
             )
 
             Spacer(Modifier.width(4.dp))
-
-            IconButton(
-                onClick = {
-                    if (!micGranted) askMic()
-                    else if (speech.listening) speech.stop() else speech.start()
-                }
-            ) {
-                Icon(
-                    Icons.Rounded.Mic,
-                    "语音输入",
-                    tint = if (speech.listening) Purple else InkSoft
-                )
-            }
 
             FilledIconButton(
                 onClick = {

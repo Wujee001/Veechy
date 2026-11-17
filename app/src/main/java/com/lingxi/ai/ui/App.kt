@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
-import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -86,10 +85,10 @@ fun App(vm: MainViewModel = viewModel()) {
                 }
             ) { inner ->
                 Box(Modifier.fillMaxSize().padding(inner)) {
-                    when (tab) {
-                        0 -> ChatScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
-                        1 -> VoiceScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
-                        else -> VideoScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
+                    if (tab == 0) {
+                        ChatScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
+                    } else {
+                        VideoScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
                     }
                 }
             }
@@ -128,7 +127,6 @@ fun App(vm: MainViewModel = viewModel()) {
 private fun AppBottomBar(selected: Int, onSelect: (Int) -> Unit) {
     val items = listOf(
         "对话" to Icons.Rounded.ChatBubbleOutline,
-        "语音" to Icons.Rounded.GraphicEq,
         "视觉" to Icons.Rounded.Videocam
     )
     NavigationBar(
