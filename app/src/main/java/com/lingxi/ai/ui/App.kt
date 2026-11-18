@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +42,7 @@ private enum class Screen { MAIN, SETTINGS, KNOWLEDGE, TIMETABLE, PROVIDERS }
 
 @Composable
 fun App(vm: MainViewModel = viewModel()) {
-    var tab by remember { mutableStateOf(0) }
+    var tab by remember { mutableStateOf(1) }
     var screen by remember { mutableStateOf(Screen.MAIN) }
     val snackbar = remember { SnackbarHostState() }
 
@@ -85,10 +86,10 @@ fun App(vm: MainViewModel = viewModel()) {
                 }
             ) { inner ->
                 Box(Modifier.fillMaxSize().padding(inner)) {
-                    if (tab == 0) {
-                        ChatScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
-                    } else {
-                        VideoScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
+                    when (tab) {
+                        0 -> JournalScreen(vm)
+                        1 -> ChatScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
+                        else -> VideoScreen(vm, onOpenSettings = { screen = Screen.SETTINGS })
                     }
                 }
             }
@@ -131,6 +132,7 @@ fun App(vm: MainViewModel = viewModel()) {
 @Composable
 private fun AppBottomBar(selected: Int, onSelect: (Int) -> Unit) {
     val items = listOf(
+        "手帐" to Icons.Rounded.MenuBook,
         "对话" to Icons.Rounded.ChatBubbleOutline,
         "视觉" to Icons.Rounded.Videocam
     )

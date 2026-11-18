@@ -11,8 +11,8 @@ android {
         applicationId = "com.lingxi.ai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 26
-        versionName = "1.9.0"
+        versionCode = 27
+        versionName = "1.10.0"
     }
 
     // 固定签名：保证每次构建的证书一致，覆盖安装不会丢数据

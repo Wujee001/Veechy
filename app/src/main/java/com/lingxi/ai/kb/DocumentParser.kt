@@ -22,7 +22,7 @@ object DocumentParser {
 
     /** 只接受这些扩展名，其他一律拒绝，避免把图片/压缩包当文本读进来。 */
     private val ALLOWED = setOf(
-        "pdf", "docx", "docm", "pptx", "pptm",
+        "pdf", "docx", "docm", "pptx", "pptm", "xlsx", "xlsm",
         "txt", "md", "markdown", "csv", "json", "log"
     )
 
@@ -62,6 +62,7 @@ object DocumentParser {
             "pdf" -> readPdfStream(context, input)
             "docx", "docm" -> readDocxStream(input)
             "pptx", "pptm" -> readPptxStream(input)
+            "xlsx", "xlsm" -> readXlsxStream(input)
             else -> {
                 val raw = readTextStream(input)
                 val bad = raw.count { it == '�' || (it < ' ' && it != '\n' && it != '\r' && it != '\t') }
@@ -146,6 +147,70 @@ object DocumentParser {
             sb.append(it.groupValues[1]).append('\n')
         }
         return unescape(sb.toString())
+    }
+
+    // ---------------------------------------------------------------- XLSX
+
+    private fun readXlsxStream(input: InputStream): String {
+        val shared = ArrayList<String>()
+        val sheets = ArrayList<Pair<String, String>>()
+
+        ZipInputStream(input).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                val name = entry.name
+                when {
+                    name == "xl/sharedStrings.xml" ->
+                        shared.addAll(parseSharedStrings(zip.readBytes().toString(Charsets.UTF_8)))
+                    name.startsWith("xl/worksheets/sheet") && name.endsWith(".xml") ->
+                        sheets.add(name to zip.readBytes().toString(Charsets.UTF_8))
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+
+        val sb = StringBuilder()
+        sheets.sortedBy { it.first }.forEach { (_, xml) ->
+            val text = sheetToText(xml, shared)
+            if (text.isNotBlank()) sb.append(text).append('\n')
+        }
+        return sb.toString()
+    }
+
+    private fun parseSharedStrings(xml: String): List<String> {
+        val out = ArrayList<String>()
+        Regex("<si>(.*?)</si>", RegexOption.DOT_MATCHES_ALL).findAll(xml).forEach { si ->
+            val text = Regex("<t[^>]*>(.*?)</t>", RegexOption.DOT_MATCHES_ALL)
+                .findAll(si.groupValues[1])
+                .joinToString("") { unescape(it.groupValues[1]) }
+            out.add(text)
+        }
+        return out
+    }
+
+    private fun sheetToText(xml: String, shared: List<String>): String {
+        val sb = StringBuilder()
+        Regex("<row[^>]*>(.*?)</row>", RegexOption.DOT_MATCHES_ALL).findAll(xml).forEach { row ->
+            val cells = ArrayList<String>()
+            Regex("<c([^>]*)>(.*?)</c>", RegexOption.DOT_MATCHES_ALL).findAll(row.groupValues[1]).forEach { c ->
+                val attrs = c.groupValues[1]
+                val inner = c.groupValues[2]
+                val isShared = attrs.contains("t=\"s\"")
+                val v = Regex("<v>(.*?)</v>").find(inner)?.groupValues?.get(1)
+                val inlineT = Regex("<t[^>]*>(.*?)</t>").find(inner)?.groupValues?.get(1)
+                val cell = when {
+                    isShared && v != null -> shared.getOrNull(v.toIntOrNull() ?: -1).orEmpty()
+                    inlineT != null -> unescape(inlineT)
+                    v != null -> v
+                    else -> ""
+                }
+                cells.add(cell)
+            }
+            val line = cells.joinToString(" | ").trim()
+            if (line.isNotBlank()) sb.append(line).append('\n')
+        }
+        return sb.toString()
     }
 
     // ---------------------------------------------------------------- 通用

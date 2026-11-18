@@ -11,6 +11,8 @@ import com.lingxi.ai.data.ChatMessage
 import com.lingxi.ai.data.ChatStore
 import com.lingxi.ai.data.Conversation
 import com.lingxi.ai.data.InnerVoice
+import com.lingxi.ai.data.JournalEntry
+import com.lingxi.ai.data.JournalStore
 import com.lingxi.ai.audio.TtsPlayer
 import com.lingxi.ai.data.Course
 import com.lingxi.ai.data.LocationHelper
@@ -46,6 +48,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val tts = TtsPlayer(app)
     val kb = KnowledgeStore(app)
+    val journal = JournalStore(app)
 
     var kbDocs by mutableStateOf(kb.docs)
         private set
@@ -57,6 +60,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var nightMode by mutableStateOf(settings.nightMode)
         private set
     var avatarPath by mutableStateOf(settings.avatarPath)
+        private set
+    var journalEntries by mutableStateOf(journal.list())
         private set
     var weatherEnabled by mutableStateOf(settings.weatherEnabled)
         private set
@@ -638,6 +643,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             weatherAt = System.currentTimeMillis()
             weatherStatus = text
         }
+    }
+
+    fun saveJournal(entry: JournalEntry): JournalEntry {
+        val saved = journal.save(entry)
+        journalEntries = journal.list()
+        return saved
+    }
+
+    fun deleteJournal(id: String) {
+        journal.delete(id)
+        journalEntries = journal.list()
     }
 
     fun updateAvatar(path: String) {

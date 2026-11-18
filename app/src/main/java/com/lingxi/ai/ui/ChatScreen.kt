@@ -5,6 +5,9 @@ package com.lingxi.ai.ui
 import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.provider.OpenableColumns
+import com.lingxi.ai.kb.DocumentParser
+import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -100,12 +103,33 @@ import java.util.Locale
 fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     var pendingImages by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pendingDocs by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var showHistory by remember { mutableStateOf(false) }
+    var showJournalPicker by remember { mutableStateOf(false) }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-        if (uris.isNotEmpty()) {
-            val saved = uris.mapNotNull { MediaUtil.saveFromUri(context, it)?.absolutePath }
-            pendingImages = (pendingImages + saved).take(9)
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull().orEmpty()
+            val name = runCatching {
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+            }.getOrNull() ?: "附件"
+            val ext = name.substringAfterLast('.', "").lowercase()
+
+            if (mime.startsWith("image/") || ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp")) {
+                MediaUtil.saveFromUri(context, uri)?.let {
+                    pendingImages = (pendingImages + it.absolutePath).take(9)
+                }
+            } else {
+                runCatching { DocumentParser.parse(context, uri) }
+                    .onSuccess { doc ->
+                        val body = if (doc.text.length > 12000) {
+                            doc.text.take(12000) + "\n…（内容过长，已截断）"
+                        } else doc.text
+                        pendingDocs = pendingDocs + (doc.name to body)
+                    }
+                    .onFailure { vm.say("附件读取失败：${it.message}") }
+            }
         }
     }
 
@@ -140,9 +164,27 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
         InputBar(
             vm = vm,
             pendingImages = pendingImages,
-            onPickImage = { picker.launch("image/*") },
+            pendingDocs = pendingDocs,
+            onPickFile = { picker.launch("*/*") },
+            onPickJournal = { showJournalPicker = true },
             onRemoveImage = { path -> pendingImages = pendingImages - path },
-            onSent = { pendingImages = emptyList() }
+            onRemoveDoc = { doc -> pendingDocs = pendingDocs - doc },
+            onSent = {
+                pendingImages = emptyList()
+                pendingDocs = emptyList()
+            }
+        )
+    }
+
+    if (showJournalPicker) {
+        JournalPickerDialog(
+            entries = vm.journalEntries,
+            onPick = { e ->
+                val body = if (e.body.length > 12000) e.body.take(12000) + "\n…（已截断）" else e.body
+                pendingDocs = pendingDocs + ("手帐·${e.title.ifBlank { "无标题" }}" to body)
+                showJournalPicker = false
+            },
+            onDismiss = { showJournalPicker = false }
         )
     }
 
@@ -464,12 +506,15 @@ private fun rememberBmp(path: String): Bitmap? = remember(path) {
 private fun InputBar(
     vm: MainViewModel,
     pendingImages: List<String>,
-    onPickImage: () -> Unit,
+    pendingDocs: List<Pair<String, String>>,
+    onPickFile: () -> Unit,
+    onPickJournal: () -> Unit,
     onRemoveImage: (String) -> Unit,
+    onRemoveDoc: (Pair<String, String>) -> Unit,
     onSent: () -> Unit
 ) {
-    val ctx = LocalContext.current
     var text by remember { mutableStateOf("") }
+    var attachMenu by remember { mutableStateOf(false) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -516,9 +561,63 @@ private fun InputBar(
             }
         }
 
+        if (pendingDocs.isNotEmpty()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                pendingDocs.forEach { doc ->
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFF1EDFF))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            doc.first,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 150.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            Icons.Rounded.Close,
+                            "移除",
+                            tint = InkSoft,
+                            modifier = Modifier.size(14.dp).clickable { onRemoveDoc(doc) }
+                        )
+                    }
+                }
+            }
+        }
+
         Row(verticalAlignment = Alignment.Bottom) {
-            IconButton(onPickImage) {
-                Icon(Icons.Rounded.Image, "图片", tint = InkSoft)
+            Box {
+                IconButton({ attachMenu = true }) {
+                    Icon(Icons.Rounded.AttachFile, "附件", tint = InkSoft)
+                }
+                DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("从文件选择") },
+                        onClick = {
+                            attachMenu = false
+                            onPickFile()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("从手帐选择") },
+                        onClick = {
+                            attachMenu = false
+                            onPickJournal()
+                        }
+                    )
+                }
             }
 
             OutlinedTextField(
@@ -552,8 +651,10 @@ private fun InputBar(
                         vm.stopGenerating()
                     } else {
                         val t = text.trim()
-                        if (t.isNotBlank() || pendingImages.isNotEmpty()) {
-                            vm.send(t, pendingImages)
+                        if (t.isNotBlank() || pendingImages.isNotEmpty() || pendingDocs.isNotEmpty()) {
+                            val attach = pendingDocs.joinToString("\n\n") { (n, c) -> "【附件：$n】\n$c" }
+                            val merged = listOf(attach, t).filter { it.isNotBlank() }.joinToString("\n\n")
+                            vm.send(merged, pendingImages)
                             text = ""
                             onSent()
                         }
@@ -637,3 +738,51 @@ private fun HistorySheet(
 
 private fun formatTime(ts: Long): String =
     SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(ts))
+
+
+@Composable
+private fun JournalPickerDialog(
+    entries: List<com.lingxi.ai.data.JournalEntry>,
+    onPick: (com.lingxi.ai.data.JournalEntry) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("从手帐选择") },
+        text = {
+            if (entries.isEmpty()) {
+                Text("还没有手帐内容", style = MaterialTheme.typography.bodySmall, color = InkSoft)
+            } else {
+                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    items(entries, key = { it.id }) { e ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onPick(e) }
+                                .padding(vertical = 10.dp, horizontal = 6.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    e.title.ifBlank { "无标题" },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    e.body.replace("\n", " ").take(40),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = InkSoft,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("取消") } }
+    )
+}
