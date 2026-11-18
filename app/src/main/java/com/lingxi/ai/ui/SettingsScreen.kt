@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Visibility
@@ -80,7 +81,7 @@ import com.lingxi.ai.ui.theme.Purple
 import com.lingxi.ai.ui.theme.PurpleSoft
 import kotlin.math.roundToInt
 
-private val Presets = listOf(
+internal val Presets = listOf(
     "七牛云" to "https://api.qnaigc.com",
     "千问兼容" to "https://maas.qianwenaiapi.com/compatible-mode/v1",
     "DeepSeek" to "https://api.deepseek.com",
