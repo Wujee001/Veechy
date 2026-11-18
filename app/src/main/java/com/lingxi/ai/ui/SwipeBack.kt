@@ -30,7 +30,7 @@ fun SwipeBackContainer(
 ) {
     var dx by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
-    val threshold = with(density) { 110.dp.toPx() }
+    val threshold = with(density) { 64.dp.toPx() }
 
     Box(Modifier.fillMaxSize()) {
         Box(
@@ -45,7 +45,7 @@ fun SwipeBackContainer(
             Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxHeight()
-                .width(28.dp)
+                .width(44.dp)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragEnd = {

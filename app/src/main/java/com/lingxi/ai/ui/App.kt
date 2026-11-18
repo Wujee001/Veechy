@@ -37,7 +37,7 @@ import com.lingxi.ai.ui.theme.InkSoft
 import com.lingxi.ai.ui.theme.Purple
 import com.lingxi.ai.ui.theme.PurpleSoft
 
-private enum class Screen { MAIN, SETTINGS, KNOWLEDGE, TIMETABLE }
+private enum class Screen { MAIN, SETTINGS, KNOWLEDGE, TIMETABLE, PROVIDERS }
 
 @Composable
 fun App(vm: MainViewModel = viewModel()) {
@@ -98,7 +98,8 @@ fun App(vm: MainViewModel = viewModel()) {
                     vm = vm,
                     onBack = { screen = Screen.MAIN },
                     onOpenKnowledge = { screen = Screen.KNOWLEDGE },
-                    onOpenTimetable = { screen = Screen.TIMETABLE }
+                    onOpenTimetable = { screen = Screen.TIMETABLE },
+                    onOpenProviders = { screen = Screen.PROVIDERS }
                 )
             }
 
@@ -108,6 +109,10 @@ fun App(vm: MainViewModel = viewModel()) {
 
             Screen.TIMETABLE -> SwipeBackContainer(onBack = { screen = Screen.SETTINGS }) {
                 TimetableScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
+            }
+
+            Screen.PROVIDERS -> SwipeBackContainer(onBack = { screen = Screen.SETTINGS }) {
+                ProvidersScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
             }
         }
 

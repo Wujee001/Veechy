@@ -11,8 +11,8 @@ android {
         applicationId = "com.lingxi.ai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 25
-        versionName = "1.8.2"
+        versionCode = 26
+        versionName = "1.9.0"
     }
 
     // 固定签名：保证每次构建的证书一致，覆盖安装不会丢数据
@@ -88,6 +88,10 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // 生物识别 / 设备凭据
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
 
     // PDF 文本抽取
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
