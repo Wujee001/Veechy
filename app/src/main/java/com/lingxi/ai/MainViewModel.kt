@@ -27,7 +27,9 @@ import com.lingxi.ai.kb.KbHit
 import com.lingxi.ai.kb.KnowledgeStore
 import com.lingxi.ai.net.ApiClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -302,10 +304,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val dead = java.util.Collections.synchronizedList(ArrayList<String>())
             probeStatus = "检测中 0/$total"
 
-            kotlinx.coroutines.coroutineScope {
+            coroutineScope {
                 p.models.chunked(4).forEach { chunk ->
                     chunk.map { m ->
-                        kotlinx.coroutines.async(Dispatchers.IO) {
+                        async(Dispatchers.IO) {
                             runCatching { api.probe(p.baseUrl, p.apiKey, m.id) }
                                 .getOrNull()
                                 ?.let { dead.add(m.id) }
