@@ -359,7 +359,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.8.0", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.8.1", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -369,7 +369,7 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "语音输入使用系统 SpeechRecognizer，朗读使用系统 TTS。若提示识别不可用，请在系统设置中安装/启用语音服务。",
+                    "朗读使用系统自带的 TTS 引擎；天气与你填写的资料都只保存在本机，API Key 不会上传到任何第三方。",
                     style = MaterialTheme.typography.labelSmall,
                     color = InkSoft
                 )

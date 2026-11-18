@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Image
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -164,6 +166,15 @@ private fun ChatTopBar(
     onNew: () -> Unit
 ) {
     var menu by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    var newTitle by remember { mutableStateOf("") }
+    val ctx = LocalContext.current
+
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            MediaUtil.saveFromUri(ctx, uri)?.let { vm.updateAvatar(it.absolutePath) }
+        }
+    }
 
     Row(
         Modifier
@@ -175,14 +186,48 @@ private fun ChatTopBar(
             Modifier
                 .size(38.dp)
                 .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Purple, Blue))),
+                .background(Brush.linearGradient(listOf(Purple, Blue)))
+                .clickable { avatarPicker.launch("image/*") },
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            val custom = vm.avatarPath.takeIf { it.isNotBlank() }?.let { rememberBmp(it) }
+            if (custom != null) {
+                Image(
+                    bitmap = custom.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(vm.current?.title ?: "Wujee's AI", style = MaterialTheme.typography.titleMedium, color = Ink, maxLines = 1)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    vm.current?.title ?: "Wujee's AI",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                IconButton(
+                    onClick = {
+                        newTitle = vm.current?.title.orEmpty()
+                        renaming = true
+                    },
+                    modifier = Modifier.size(26.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Edit,
+                        "重命名",
+                        tint = InkSoft.copy(alpha = 0.65f),
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
             Box {
                 Row(
                     Modifier
@@ -239,6 +284,29 @@ private fun ChatTopBar(
         IconButton(onNew) { Icon(Icons.Rounded.AddCircleOutline, "新对话", tint = InkSoft) }
         IconButton(onHistory) { Icon(Icons.Rounded.History, "历史对话", tint = InkSoft) }
         IconButton(onOpenSettings) { Icon(Icons.Rounded.Settings, "设置", tint = InkSoft) }
+    }
+
+    if (renaming) {
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text("重命名对话") },
+            text = {
+                OutlinedTextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            },
+            confirmButton = {
+                TextButton({
+                    if (newTitle.isNotBlank()) vm.renameCurrent(newTitle.trim())
+                    renaming = false
+                }) { Text("保存") }
+            },
+            dismissButton = { TextButton({ renaming = false }) { Text("取消") } }
+        )
     }
 }
 

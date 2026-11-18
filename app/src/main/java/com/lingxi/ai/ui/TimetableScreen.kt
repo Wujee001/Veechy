@@ -102,7 +102,7 @@ fun TimetableScreen(vm: MainViewModel, onBack: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text("在对话中启用课表", style = MaterialTheme.typography.bodyMedium, color = Ink)
                         Text(
-                            "关掉后只注入当前时间，不再带整周课表，可省 token",
+                            "打开可让 TA 了解你的日程",
                             style = MaterialTheme.typography.labelSmall,
                             color = InkSoft
                         )

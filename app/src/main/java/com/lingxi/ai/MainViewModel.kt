@@ -53,6 +53,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var autoSpeak by mutableStateOf(settings.autoSpeak)
     var nightMode by mutableStateOf(settings.nightMode)
         private set
+    var avatarPath by mutableStateOf(settings.avatarPath)
+        private set
     var weatherEnabled by mutableStateOf(settings.weatherEnabled)
         private set
     var timetableEnabled by mutableStateOf(settings.timetableEnabled)
@@ -383,6 +385,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (acc.isNotBlank()) patchLast { it.copy(text = acc) }
             } catch (e: Exception) {
                 val msg = e.message ?: "请求失败"
+                // 服务端明确说模型已下架：从列表里移除，避免下次再选到
+                if (msg.contains("retired", true) || msg.contains("no longer available", true)) {
+                    val updated = provider.copy(models = provider.models.filterNot { it.id == model })
+                    if (updated.models.size != provider.models.size) {
+                        updateProvider(updated)
+                        if (activeModelId == model) {
+                            updated.models.firstOrNull()?.let { selectModel(provider.id, it.id) }
+                        }
+                        status = "这个模型已下架，已从列表移除"
+                    }
+                }
                 if (acc.isBlank()) {
                     patchLast { it.copy(text = msg, error = true) }
                 } else {
@@ -572,13 +585,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             val text = runCatching { WeatherClient.summary(loc.first, loc.second) }.getOrNull()
             if (text == null) {
-                weatherStatus = "天气请求失败（网络不可达）"
+                weatherStatus = "跨境连接不稳定（服务器在欧洲）"
                 return@launch
             }
             weatherCache = text
             weatherAt = System.currentTimeMillis()
-            weatherStatus = "已更新"
+            weatherStatus = text
         }
+    }
+
+    fun updateAvatar(path: String) {
+        avatarPath = path
+        settings.avatarPath = path
     }
 
     fun updateNightMode(value: Boolean) {
