@@ -161,6 +161,33 @@ class ApiClient {
         }
     }
 
+    /**
+     * 单模型探活。返回 null 表示可用；返回字符串表示不可用的原因。
+     * 网络异常一律视为可用，避免误删。
+     */
+    suspend fun probe(base: String, key: String, model: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val payload = JSONObject().apply {
+                put("model", model)
+                put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", "hi")))
+                put("max_tokens", 1)
+                put("stream", false)
+            }
+            val req = Request.Builder()
+                .url(endpoint(base, "/chat/completions"))
+                .apply { if (key.isNotBlank()) header("Authorization", "Bearer $key") }
+                .post(payload.toString().toRequestBody(JSON))
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) return@use null
+                val msg = extractError(resp.body?.string().orEmpty())
+                val dead = listOf("retired", "no longer available", "not found", "not exist", "no available channels")
+                if (dead.any { msg.contains(it, true) }) msg else null
+            }
+        }.getOrNull()
+    }
+
     /** 连通性检测：只请求 /models，不消耗 token。 */
     suspend fun test(base: String, key: String): String = withContext(Dispatchers.IO) {
         val models = fetchModels(base, key)

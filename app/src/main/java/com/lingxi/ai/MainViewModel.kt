@@ -27,6 +27,7 @@ import com.lingxi.ai.kb.KbHit
 import com.lingxi.ai.kb.KnowledgeStore
 import com.lingxi.ai.net.ApiClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -60,6 +61,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var timetableEnabled by mutableStateOf(settings.timetableEnabled)
         private set
     var weatherStatus by mutableStateOf(if (settings.weatherEnabled) "获取中…" else "未启用")
+        private set
+    var probing by mutableStateOf(false)
+        private set
+    var probeStatus by mutableStateOf("")
         private set
 
     private var weatherCache = ""
@@ -282,6 +287,45 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 onSuccess = { "[${p.name}] $it" },
                 onFailure = { "[${p.name}] 失败：${it.message}" }
             )
+        }
+    }
+
+    /** 批量探活：逐个 ping，把服务端明确说不可用的模型移除。 */
+    fun probeModels(providerId: String) {
+        val p = providers.firstOrNull { it.id == providerId } ?: return
+        if (probing || p.models.isEmpty()) return
+
+        viewModelScope.launch {
+            probing = true
+            val total = p.models.size
+            val done = java.util.concurrent.atomic.AtomicInteger(0)
+            val dead = java.util.Collections.synchronizedList(ArrayList<String>())
+            probeStatus = "检测中 0/$total"
+
+            kotlinx.coroutines.coroutineScope {
+                p.models.chunked(4).forEach { chunk ->
+                    chunk.map { m ->
+                        kotlinx.coroutines.async(Dispatchers.IO) {
+                            runCatching { api.probe(p.baseUrl, p.apiKey, m.id) }
+                                .getOrNull()
+                                ?.let { dead.add(m.id) }
+                            probeStatus = "检测中 ${done.incrementAndGet()}/$total"
+                        }
+                    }.awaitAll()
+                }
+            }
+
+            val removed = dead.toList()
+            if (removed.isNotEmpty()) {
+                val updated = p.copy(models = p.models.filterNot { it.id in removed })
+                updateProvider(updated)
+                if (activeModelId in removed) {
+                    updated.models.firstOrNull()?.let { selectModel(p.id, it.id) }
+                }
+            }
+            probing = false
+            probeStatus = ""
+            status = if (removed.isEmpty()) "检测完成：全部可用" else "检测完成：移除 ${removed.size} 个不可用模型"
         }
     }
 
@@ -585,7 +629,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             val text = runCatching { WeatherClient.summary(loc.first, loc.second) }.getOrNull()
             if (text == null) {
-                weatherStatus = "跨境连接不稳定（服务器在欧洲）"
+                weatherStatus = "（失败，跨境连接不稳定）"
                 return@launch
             }
             weatherCache = text

@@ -133,7 +133,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(vm.messages, key = { it.id }) { m -> MessageBubble(m) }
+                items(vm.messages, key = { it.id }) { m -> MessageBubble(m, vm.avatarPath) }
             }
         }
 
@@ -352,7 +352,7 @@ private fun EmptyChat(onPickSuggest: (String) -> Unit, modifier: Modifier = Modi
 // ---------------------------------------------------------------- 气泡
 
 @Composable
-fun MessageBubble(m: ChatMessage) {
+fun MessageBubble(m: ChatMessage, avatarPath: String = "") {
     val isUser = m.role == "user"
 
     Row(
@@ -367,7 +367,17 @@ fun MessageBubble(m: ChatMessage) {
                     .background(Brush.linearGradient(listOf(Purple, Blue))),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                val custom = avatarPath.takeIf { it.isNotBlank() }?.let { rememberBmp(it) }
+                if (custom != null) {
+                    Image(
+                        bitmap = custom.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                }
             }
             Spacer(Modifier.width(8.dp))
         }

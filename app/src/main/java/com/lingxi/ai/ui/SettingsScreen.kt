@@ -359,7 +359,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Wujee's AI 1.8.1", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Wujee's AI 1.8.2", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -543,6 +543,22 @@ private fun ProviderCard(vm: MainViewModel, provider: Provider, onDelete: () -> 
 
                 IconButton(onDelete) {
                     Icon(Icons.Rounded.Delete, "删除", tint = InkSoft.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                }
+            }
+
+            if (provider.models.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { vm.probeModels(provider.id) },
+                    enabled = !vm.probing,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        if (vm.probing) vm.probeStatus.ifBlank { "检测中…" } else "检测可用模型（会消耗少量额度）",
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
             }
 
