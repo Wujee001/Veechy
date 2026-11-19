@@ -356,7 +356,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Veechy 1.11.2", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Veechy 1.11.3", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,

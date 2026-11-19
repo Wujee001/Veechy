@@ -10,6 +10,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -106,20 +109,14 @@ fun Badge(text: String, color: Color) {
 
 @Composable
 fun GradientDot(size: Int = 34) {
-    Box(
-        Modifier
+    Image(
+        painter = painterResource(com.lingxi.ai.R.drawable.avatar_default),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
             .size(size.dp)
             .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(Purple, Blue))),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            Icons.Rounded.GraphicEq,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size((size * 0.55f).dp)
-        )
-    }
+    )
 }
 
 /** 语音动效球：随输入音量缩放。 */
