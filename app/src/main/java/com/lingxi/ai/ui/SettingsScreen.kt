@@ -254,7 +254,7 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text("天气", style = MaterialTheme.typography.bodyMedium, color = Ink)
                         Text(
-                            "按定位查实时气温与降水，Open-Meteo 免密钥",
+                            "按定位查实时气温与降水，Open-Meteo免密钥",
                             style = MaterialTheme.typography.labelSmall,
                             color = InkSoft
                         )
@@ -296,7 +296,7 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text("夜间模式", style = MaterialTheme.typography.bodyMedium, color = Ink)
                         Text(
-                            "整体调暗，配色不变",
+                            "仅整体调暗",
                             style = MaterialTheme.typography.labelSmall,
                             color = InkSoft
                         )
@@ -356,7 +356,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Veechy 1.11.3", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Veechy 1.11.5", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -366,7 +366,7 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "朗读使用系统自带的 TTS 引擎；天气与你填写的资料都只保存在本机，API Key 不会上传到任何第三方。",
+                    "朗读使用系统自带的 TTS 引擎；用户填写的资料都只保存在本机，API Key 不会上传到任何第三方。",
                     style = MaterialTheme.typography.labelSmall,
                     color = InkSoft
                 )
