@@ -231,6 +231,10 @@ class SettingsStore(context: Context) {
         get() = sp.getString(KEY_AVATAR, "") ?: ""
         set(value) = sp.edit().putString(KEY_AVATAR, value).apply()
 
+    var avatarResetV2: Boolean
+        get() = sp.getBoolean(KEY_AVATAR_RESET, false)
+        set(value) = sp.edit().putBoolean(KEY_AVATAR_RESET, value).apply()
+
     var nightMode: Boolean
         get() = sp.getBoolean(KEY_NIGHT, false)
         set(value) = sp.edit().putBoolean(KEY_NIGHT, value).apply()
@@ -271,6 +275,7 @@ class SettingsStore(context: Context) {
         private const val KEY_TT_RULES = "timetable_rules"
         private const val KEY_NIGHT = "night_mode"
         private const val KEY_AVATAR = "avatar_path"
+        private const val KEY_AVATAR_RESET = "avatar_reset_v2"
         private const val KEY_TT_ON = "timetable_enabled"
         private const val KEY_WEATHER = "weather_enabled"
     }

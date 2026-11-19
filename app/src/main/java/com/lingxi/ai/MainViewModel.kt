@@ -130,6 +130,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     init {
+        // 一次性迁移：换新版默认头像时，清掉旧的用户自定义头像
+        if (!settings.avatarResetV2) {
+            settings.avatarPath = ""
+            avatarPath = ""
+            settings.avatarResetV2 = true
+        }
         tts.updateRate(settings.speechRate)
         if (weatherEnabled) refreshWeather()
         val list = conversations
@@ -728,7 +734,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     "content",
                     "你是图书信息助手。根据 ISBN 输出这本书的信息，只输出一个 JSON 对象，" +
                         "不要解释、不要代码块标记。字段：title、authors、publisher、year、" +
-                        "pages、subjects、description。不确定的字段用空字符串，禁止编造。"
+                        "pages、subjects、description、catalog。description 写内容简介；" +
+                        "catalog 写主要章节（不超过 20 行，用换行分隔）。" +
+                        "如果开启了联网检索，请以搜索结果为准（电商详情页、出版社页）；" +
+                        "查不到确切信息就留空字符串，禁止编造。"
                 )
             )
             put(JSONObject().put("role", "user").put("content", "ISBN: $isbn"))
@@ -760,7 +769,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             year = o.optString("year"),
             pages = o.optString("pages"),
             subjects = o.optString("subjects"),
-            description = o.optString("description"),
+            description = listOf(
+                o.optString("description"),
+                o.optString("catalog").takeIf { it.isNotBlank() }?.let { "\n\n目录：\n$it" }.orEmpty()
+            ).joinToString("").trim(),
             link = "",
             origin = "model"
         )

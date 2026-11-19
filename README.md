@@ -1,6 +1,6 @@
-# Wujee's AI
+# Veechy
 
-本地运行的 Android AI 助手。自填 API，直连任意 **OpenAI 兼容** 服务（七牛云、千问兼容模式、DeepSeek、OpenAI、Ollama / LM Studio 等）。
+本地运行的 Android AI 助手（Veechy）。自填 API，直连任意 **OpenAI 兼容** 服务（七牛云、千问兼容模式、DeepSeek、OpenAI、Ollama / LM Studio 等）。
 文字、语音、视觉三种对话模式，带本地知识库，界面为紫蓝白浅色渐变。
 
 ## 功能

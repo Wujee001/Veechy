@@ -55,6 +55,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -208,7 +210,7 @@ private fun JournalEditor(
     val isNew = entry.title.isBlank() && entry.body.isBlank() && entry.images.isEmpty()
 
     var title by remember(entry.id) { mutableStateOf(entry.title) }
-    var body by remember(entry.id) { mutableStateOf(entry.body) }
+    var bodyValue by remember(entry.id) { mutableStateOf(TextFieldValue(entry.body)) }
     var images by remember(entry.id) { mutableStateOf(entry.images) }
     var previewing by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<String?>(null) }
@@ -218,6 +220,28 @@ private fun JournalEditor(
             val saved = uris.mapNotNull { MediaUtil.saveFromUri(ctx, it)?.absolutePath }
             images = images + saved
         }
+    }
+
+    fun surround(prefix: String, suffix: String = prefix) {
+        val text = bodyValue.text
+        val sel = bodyValue.selection
+        val a = minOf(sel.start, sel.end).coerceIn(0, text.length)
+        val b = maxOf(sel.start, sel.end).coerceIn(0, text.length)
+        val chosen = text.substring(a, b)
+        val insert = prefix + chosen + suffix
+        bodyValue = TextFieldValue(text.replaceRange(a, b, insert), TextRange(a + insert.length))
+    }
+
+    fun linePrefix(prefix: String) {
+        val text = bodyValue.text
+        val sel = bodyValue.selection
+        val at = minOf(sel.start, sel.end).coerceIn(0, text.length)
+        val lineStart = text.lastIndexOf('\n', (at - 1).coerceAtLeast(0))
+            .let { if (it < 0) 0 else it + 1 }
+        bodyValue = TextFieldValue(
+            text.substring(0, lineStart) + prefix + text.substring(lineStart),
+            TextRange(at + prefix.length)
+        )
     }
 
     Scaffold(
@@ -241,7 +265,11 @@ private fun JournalEditor(
                     }
                     TextButton({
                         vm.saveJournal(
-                            entry.copy(title = title.trim(), body = body, images = images)
+                            entry.copy(
+                                title = title.trim(),
+                                body = bodyValue.text,
+                                images = images
+                            )
                         )
                         onClose()
                     }) { Text("保存", color = Purple) }
@@ -255,9 +283,8 @@ private fun JournalEditor(
                 .fillMaxSize()
                 .padding(inner)
                 .imePadding()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp)
-                .padding(bottom = 32.dp)
+                .padding(bottom = 12.dp)
         ) {
             OutlinedTextField(
                 value = title,
@@ -268,31 +295,47 @@ private fun JournalEditor(
                 shape = RoundedCornerShape(10.dp)
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
             if (previewing) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 200.dp)
+                        .weight(1f)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color.White)
+                        .verticalScroll(rememberScrollState())
                         .padding(12.dp)
                 ) {
-                    if (body.isBlank()) {
+                    if (bodyValue.text.isBlank()) {
                         Text("（没有内容）", style = MaterialTheme.typography.bodySmall, color = InkSoft)
                     } else {
-                        MarkdownText(body, color = Ink)
+                        MarkdownText(bodyValue.text, color = Ink)
                     }
                 }
             } else {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    MdButton("加粗") { surround("**") }
+                    MdButton("斜体") { surround("*") }
+                    MdButton("标题") { linePrefix("## ") }
+                    MdButton("引用") { linePrefix("> ") }
+                    MdButton("列表") { linePrefix("- ") }
+                    MdButton("代码") { surround("`") }
+                }
+
                 OutlinedTextField(
-                    value = body,
-                    onValueChange = { body = it },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 520.dp),
+                    value = bodyValue,
+                    onValueChange = { bodyValue = it },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     placeholder = {
                         Text(
-                            "支持 Markdown：# 标题、- 列表、**加粗**、`代码`、| 表格 |",
+                            "支持 Markdown：**加粗**、> 引用、- 列表、`代码`、| 表格 |",
                             style = MaterialTheme.typography.bodySmall
                         )
                     },
@@ -327,9 +370,9 @@ private fun JournalEditor(
                     Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    images.forEach { p ->
+                    images.forEach { path ->
                         Box {
-                            val bmp = rememberBmpSmall(p)
+                            val bmp = rememberBmpSmall(path)
                             if (bmp != null) {
                                 Image(
                                     bitmap = bmp.asImageBitmap(),
@@ -338,7 +381,7 @@ private fun JournalEditor(
                                     modifier = Modifier
                                         .size(64.dp)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .clickable { preview = p }
+                                        .clickable { preview = path }
                                 )
                             }
                             Box(
@@ -347,7 +390,7 @@ private fun JournalEditor(
                                     .size(18.dp)
                                     .clip(CircleShape)
                                     .background(Color.Black.copy(alpha = 0.55f))
-                                    .clickable { images = images - p },
+                                    .clickable { images = images - path },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -361,17 +404,23 @@ private fun JournalEditor(
                     }
                 }
             }
-
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "点图片可以放大查看",
-                style = MaterialTheme.typography.labelSmall,
-                color = InkSoft.copy(alpha = 0.7f)
-            )
         }
     }
 
     preview?.let { ImageViewer(it) { preview = null } }
+}
+
+@Composable
+private fun MdButton(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF1EDFF))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Purple)
+    }
 }
 
 /** 全屏查看，点击任意处关闭。 */

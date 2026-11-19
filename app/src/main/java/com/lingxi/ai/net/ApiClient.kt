@@ -25,7 +25,7 @@ import kotlin.coroutines.coroutineContext
 class ApiClient {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(45, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)

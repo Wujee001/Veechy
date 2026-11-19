@@ -80,6 +80,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -123,8 +124,8 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             } else {
                 runCatching { DocumentParser.parse(context, uri) }
                     .onSuccess { doc ->
-                        val body = if (doc.text.length > 12000) {
-                            doc.text.take(12000) + "\n…（内容过长，已截断）"
+                        val body = if (doc.text.length > 6000) {
+                            doc.text.take(6000) + "\n…（内容过长，已截断）"
                         } else doc.text
                         pendingDocs = pendingDocs + (doc.name to body)
                     }
@@ -180,7 +181,7 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
         JournalPickerDialog(
             entries = vm.journalEntries,
             onPick = { e ->
-                val body = if (e.body.length > 12000) e.body.take(12000) + "\n…（已截断）" else e.body
+                val body = if (e.body.length > 6000) e.body.take(6000) + "\n…（已截断）" else e.body
                 pendingDocs = pendingDocs + ("手帐·${e.title.ifBlank { "无标题" }}" to body)
                 showJournalPicker = false
             },
@@ -241,14 +242,19 @@ private fun ChatTopBar(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Image(
+                    painter = painterResource(com.lingxi.ai.R.drawable.avatar_default),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    vm.current?.title ?: "Wujee's AI",
+                    vm.current?.title ?: "Veechy",
                     style = MaterialTheme.typography.titleMedium,
                     color = Ink,
                     maxLines = 1,
@@ -418,7 +424,12 @@ fun MessageBubble(m: ChatMessage, avatarPath: String = "") {
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Icon(Icons.Rounded.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Image(
+                        painter = painterResource(com.lingxi.ai.R.drawable.avatar_default),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
             Spacer(Modifier.width(8.dp))
