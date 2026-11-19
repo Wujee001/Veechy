@@ -55,18 +55,24 @@ object DocImages {
         val out = ArrayList<String>()
         val pfd = context.contentResolver.openFileDescriptor(uri, "r") ?: return out
         pfd.use { descriptor ->
-            PdfRenderer(descriptor).use { renderer ->
+            val renderer = PdfRenderer(descriptor)
+            try {
                 val pages = minOf(renderer.pageCount, limit)
                 for (i in 0 until pages) {
-                    renderer.openPage(i).use { page ->
+                    val page = renderer.openPage(i)
+                    try {
                         val width = 1024
                         val height = (width * page.height / page.width.toFloat()).toInt().coerceAtLeast(1)
                         val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                         bmp.eraseColor(Color.WHITE)
                         page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                         out.add(MediaUtil.saveBitmap(context, bmp, 1024).absolutePath)
+                    } finally {
+                        runCatching { page.close() }
                     }
                 }
+            } finally {
+                runCatching { renderer.close() }
             }
         }
         return out
