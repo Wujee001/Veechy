@@ -11,7 +11,7 @@ android {
         applicationId = "com.lingxi.ai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 31
+        versionCode = 32
         versionName = "1.11.4"
     }
 
