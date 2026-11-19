@@ -12,7 +12,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 31
-        versionName = "1.11.3"
+        versionName = "1.11.4"
     }
 
     // 固定签名：保证每次构建的证书一致，覆盖安装不会丢数据
