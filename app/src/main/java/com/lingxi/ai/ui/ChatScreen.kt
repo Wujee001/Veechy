@@ -386,9 +386,9 @@ private fun EmptyChat(onPickSuggest: (String) -> Unit, modifier: Modifier = Modi
         )
         Spacer(Modifier.height(22.dp))
         listOf(
-            "用三句话解释一下量子纠缠",
-            "帮我把这段话改得更简洁",
-            "写一个 Python 快速排序"
+            "你是谁？",
+            "现在是什么时候？",
+            "简单教我一些英语四六级高级词汇"
         ).forEach { s ->
             Box(
                 Modifier
