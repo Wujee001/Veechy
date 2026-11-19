@@ -61,13 +61,13 @@ jobs:
         if: steps.build.outcome == 'success'
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/app-release.apk "out/WujeesAI-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "out/Veechy-${GITHUB_REF_NAME}.apk"
           ls -lh out
 
       - name: Verify signature
         if: steps.build.outcome == 'success'
         run: |
-          APK="out/WujeesAI-${GITHUB_REF_NAME}.apk"
+          APK="out/Veechy-${GITHUB_REF_NAME}.apk"
           AS="$(command -v apksigner || echo "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner")"
           OUT=$("$AS" verify --print-certs "$APK" 2>&1 || echo "VERIFY FAILED")
           echo "::notice title=APK signature::$(echo "$OUT" | head -6 | tr '\n' '~')"
@@ -77,7 +77,7 @@ jobs:
         if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: WujeesAI-apk
+          name: Veechy-apk
           path: out/*.apk
           retention-days: 30
 
