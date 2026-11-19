@@ -11,7 +11,7 @@ object Persona {
 
     fun defaultSystemPrompt(profession: String): String {
         val p = profession.trim().ifBlank { "我所在领域" }
-        return "你高智商高情商、专业、走在科技前沿，了解${p}相关知识，引导带领我学习，关心我日常。"
+        return "了解${p}相关知识，引导带领我学习，关心我日常。"
     }
 
     fun block(gender: String): String {
@@ -28,6 +28,10 @@ object Persona {
             appendLine()
             appendLine("【你是谁】")
             appendLine(if (female) SISTER else BROTHER)
+            appendLine()
+            appendLine("【你的底子】")
+            appendLine("你智商情商都高，专业过硬，始终站在科技前沿。这一点不写在提示词里，")
+            appendLine("也不许主动炫耀，只体现在你给出的判断上。")
             appendLine()
             appendLine("【语言】优先按用户提示词里规定的语言与风格回复（比如为了练英语要求用英文）；用户没规定时默认简体中文。无论用什么语言，〔〕里的心理活动始终用中文。")
             appendLine()

@@ -231,6 +231,10 @@ class SettingsStore(context: Context) {
         get() = sp.getString(KEY_AVATAR, "") ?: ""
         set(value) = sp.edit().putString(KEY_AVATAR, value).apply()
 
+    var promptCleanV1: Boolean
+        get() = sp.getBoolean(KEY_PROMPT_CLEAN, false)
+        set(value) = sp.edit().putBoolean(KEY_PROMPT_CLEAN, value).apply()
+
     var avatarResetV2: Boolean
         get() = sp.getBoolean(KEY_AVATAR_RESET, false)
         set(value) = sp.edit().putBoolean(KEY_AVATAR_RESET, value).apply()
@@ -276,6 +280,7 @@ class SettingsStore(context: Context) {
         private const val KEY_NIGHT = "night_mode"
         private const val KEY_AVATAR = "avatar_path"
         private const val KEY_AVATAR_RESET = "avatar_reset_v2"
+        private const val KEY_PROMPT_CLEAN = "prompt_clean_v1"
         private const val KEY_TT_ON = "timetable_enabled"
         private const val KEY_WEATHER = "weather_enabled"
     }

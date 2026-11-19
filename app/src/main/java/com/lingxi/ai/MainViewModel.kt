@@ -130,6 +130,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     init {
+        // 一次性迁移：把「高智商高情商…」移进隐藏人设，用户提示词只留个性化部分
+        if (!settings.promptCleanV1) {
+            val cleaned = settings.systemPrompt
+                .replace("你高智商高情商、专业、走在科技前沿，", "")
+                .replace("高智商高情商、专业、走在科技前沿，", "")
+                .trim()
+                .ifBlank { Persona.defaultSystemPrompt(settings.profession) }
+            settings.systemPrompt = cleaned
+            systemPrompt = cleaned
+            settings.promptCleanV1 = true
+        }
         // 一次性迁移：换新版默认头像时，清掉旧的用户自定义头像
         if (!settings.avatarResetV2) {
             settings.avatarPath = ""

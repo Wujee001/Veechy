@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.provider.OpenableColumns
+import com.lingxi.ai.kb.DocImages
 import com.lingxi.ai.kb.DocumentParser
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.foundation.Image
@@ -128,6 +129,10 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
                             doc.text.take(6000) + "\n…（内容过长，已截断）"
                         } else doc.text
                         pendingDocs = pendingDocs + (doc.name to body)
+                        val imgs = DocImages.extract(context, uri, doc.kind, 4)
+                        if (imgs.isNotEmpty()) {
+                            pendingImages = (pendingImages + imgs).take(9)
+                        }
                     }
                     .onFailure { vm.say("附件读取失败：${it.message}") }
             }
@@ -183,6 +188,9 @@ fun ChatScreen(vm: MainViewModel, onOpenSettings: () -> Unit) {
             onPick = { e ->
                 val body = if (e.body.length > 6000) e.body.take(6000) + "\n…（已截断）" else e.body
                 pendingDocs = pendingDocs + ("手帐·${e.title.ifBlank { "无标题" }}" to body)
+                if (e.images.isNotEmpty()) {
+                    pendingImages = (pendingImages + e.images).take(9)
+                }
                 showJournalPicker = false
             },
             onDismiss = { showJournalPicker = false }
