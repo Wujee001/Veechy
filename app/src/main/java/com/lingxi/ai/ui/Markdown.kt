@@ -197,7 +197,7 @@ private fun parseMarkdown(src: String): List<MdBlock> {
             val close = if (t.startsWith("$$")) "$$" else "\\]"
             val body = StringBuilder(t.removePrefix(open).trim())
             if (body.contains(close)) {
-                out.add(MdBlock.Math(body.substringBefore(close).trim()))
+                out.add(MdBlock.Math(body.toString().substringBefore(close).trim()))
                 i++
                 continue
             }
