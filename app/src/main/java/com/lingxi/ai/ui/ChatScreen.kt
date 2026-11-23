@@ -478,6 +478,15 @@ fun MessageBubble(m: ChatMessage, avatarPath: String = "") {
                 }
             }
 
+            if (m.pet) {
+                Text(
+                    "桌面留言",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Purple
+                )
+                Spacer(Modifier.height(3.dp))
+            }
+
             val (thought, rawBody) = remember(m.text) { InnerVoice.split(m.text) }
             if (thought != null) {
                 Text(

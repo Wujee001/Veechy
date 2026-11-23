@@ -28,6 +28,7 @@ import com.lingxi.ai.kb.KbDoc
 import com.lingxi.ai.kb.KbHit
 import com.lingxi.ai.kb.KnowledgeStore
 import com.lingxi.ai.net.ApiClient
+import com.lingxi.ai.pet.PetOutbox
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -156,6 +157,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             current = list.first()
         }
         if (settings.onboarded) loadGift()
+        drainPetMessages()
+    }
+
+    /** 桌宠在桌面说过的话，回到 App 时并进当前对话。 */
+    fun drainPetMessages() {
+        if (current == null) return
+        val list = PetOutbox.drain(getApplication())
+        if (list.isEmpty()) return
+        var c = current ?: return
+        list.forEach { text ->
+            c = c.copy(
+                messages = c.messages + ChatMessage(role = "assistant", text = text, pet = true),
+                updatedAt = System.currentTimeMillis()
+            )
+        }
+        push(c)
     }
 
     // ------------------------------------------------------------ 首启引导
@@ -817,6 +834,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         courses = emptyList()
         settings.timetableJson = ""
         status = "课表已清空"
+    }
+
+    /** 模型识别不准时，用户自己改某一节课。 */
+    fun updateCourse(original: Course, updated: Course) {
+        val idx = courses.indexOfFirst { it === original }
+            .let { if (it >= 0) it else courses.indexOf(original) }
+        if (idx < 0) return
+        val list = courses.toMutableList()
+        list[idx] = updated
+        courses = list.sortedWith(compareBy({ it.weekday }, { it.start }))
+        settings.timetableJson = Timetable.encode(courses)
+        status = "已更新《${updated.name.ifBlank { "课程" }}》"
+    }
+
+    fun deleteCourse(course: Course) {
+        val idx = courses.indexOfFirst { it === course }
+            .let { if (it >= 0) it else courses.indexOf(course) }
+        if (idx < 0) return
+        val list = courses.toMutableList().also { it.removeAt(idx) }
+        courses = list
+        settings.timetableJson = Timetable.encode(courses)
+        status = "已删除《${course.name.ifBlank { "课程" }}》"
     }
 
     fun parseTimetable(imagePath: String?) {

@@ -20,6 +20,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,8 +32,11 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lingxi.ai.MainViewModel
+import com.lingxi.ai.pet.PetBus
 import com.lingxi.ai.ui.theme.GradientBackground
 import com.lingxi.ai.ui.theme.InkSoft
 import com.lingxi.ai.ui.theme.Purple
@@ -56,6 +60,14 @@ fun App(vm: MainViewModel = viewModel()) {
             snackbar.showSnackbar(s)
             vm.consumeStatus()
         }
+    }
+
+    // 桌宠留言：回到前台、或桌宠刚说完话时并入当前对话
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.drainPetMessages() }
+    DisposableEffect(vm) {
+        val listener = { vm.drainPetMessages() }
+        PetBus.register(listener)
+        onDispose { PetBus.unregister(listener) }
     }
 
     // 重新填写完成后回到主界面，不留在设置页

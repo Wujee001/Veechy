@@ -3,6 +3,13 @@
 package com.lingxi.ai.ui
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -66,12 +73,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.lingxi.ai.BuildConfig
 import com.lingxi.ai.MainViewModel
+import com.lingxi.ai.pet.PetPrefs
+import com.lingxi.ai.pet.PetService
 import com.lingxi.ai.data.Provider
 import com.lingxi.ai.ui.theme.Blue
 import com.lingxi.ai.ui.theme.Ink
@@ -313,6 +325,116 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+            SectionTitle("桌面小 Veechy")
+            SoftCard {
+                val ctx = LocalContext.current
+                var petOn by remember { mutableStateOf(PetPrefs.enabled(ctx)) }
+                var petMsg by remember { mutableStateOf(PetPrefs.messagesEnabled(ctx)) }
+
+                val notifyLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) {}
+
+                val overlayLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) {
+                    if (Settings.canDrawOverlays(ctx)) {
+                        PetPrefs.setEnabled(ctx, true)
+                        petOn = true
+                        startPet(ctx)
+                        askNotify(ctx, notifyLauncher::launch)
+                    } else {
+                        petOn = false
+                        vm.say("没有「显示在其他应用上层」权限，桌宠无法出现")
+                    }
+                }
+
+                fun enablePet() {
+                    PetPrefs.setEnabled(ctx, true)
+                    petOn = true
+                    startPet(ctx)
+                    askNotify(ctx, notifyLauncher::launch)
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("放在桌面上", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "小 Veechy 悬浮在桌面，可拖动、点一下会互动",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Switch(
+                        checked = petOn,
+                        onCheckedChange = { on ->
+                            if (on) {
+                                if (Settings.canDrawOverlays(ctx)) enablePet()
+                                else runCatching {
+                                    overlayLauncher.launch(
+                                        Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${ctx.packageName}")
+                                        )
+                                    )
+                                }.onFailure {
+                                    vm.say("请在系统设置里允许「显示在其他应用上层」")
+                                }
+                            } else {
+                                PetPrefs.setEnabled(ctx, false)
+                                petOn = false
+                                runCatching { ctx.stopService(Intent(ctx, PetService::class.java)) }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("定时冒一句话", style = MaterialTheme.typography.bodyMedium, color = Ink)
+                        Text(
+                            "隔 1–3 小时随机说一句，气泡里先出现，打开 App 后会留在当前对话",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InkSoft
+                        )
+                    }
+                    Switch(
+                        checked = petMsg,
+                        onCheckedChange = { on ->
+                            PetPrefs.setMessagesEnabled(ctx, on)
+                            petMsg = on
+                            if (petOn) {
+                                runCatching {
+                                    ctx.startService(
+                                        Intent(ctx, PetService::class.java)
+                                            .setAction(PetService.ACTION_RELOAD)
+                                    )
+                                }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+
+                if (petOn) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "小提示：点一下会说话，双击打开 App，拖动可换位置。部分系统需再允许「后台弹出界面 / 自启动」，否则锁屏或清理后台后桌宠会消失。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = InkSoft
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
             SectionTitle("API 供应商")
             SoftCard {
                 Row(
@@ -356,7 +478,7 @@ fun SettingsScreen(
                     GradientDot(28)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Veechy 1.11.5", style = MaterialTheme.typography.titleSmall, color = Ink)
+                        Text("Veechy ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall, color = Ink)
                         Text(
                             "本地运行 · API Key 只存在本机",
                             style = MaterialTheme.typography.labelSmall,
@@ -478,3 +600,19 @@ internal fun fieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedTextColor = Ink,
     cursorColor = Purple
 )
+
+
+private fun startPet(ctx: android.content.Context) {
+    runCatching {
+        ContextCompat.startForegroundService(ctx, Intent(ctx, PetService::class.java))
+    }
+}
+
+private fun askNotify(ctx: android.content.Context, launch: (String) -> Unit) {
+    if (Build.VERSION.SDK_INT >= 33 &&
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) !=
+        PackageManager.PERMISSION_GRANTED
+    ) {
+        launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}

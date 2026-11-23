@@ -94,6 +94,7 @@ data class ChatMessage(
     val images: List<String> = emptyList(),
     val reasoning: String? = null,
     val error: Boolean = false,
+    val pet: Boolean = false,
     val time: Long = System.currentTimeMillis()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
@@ -103,6 +104,7 @@ data class ChatMessage(
         put("images", JSONArray().also { a -> images.forEach { a.put(it) } })
         put("reasoning", reasoning ?: "")
         put("error", error)
+        put("pet", pet)
         put("time", time)
     }
 
@@ -123,6 +125,7 @@ data class ChatMessage(
                 images = list,
                 reasoning = o.optString("reasoning").ifBlank { null },
                 error = o.optBoolean("error"),
+                pet = o.optBoolean("pet"),
                 time = o.optLong("time", System.currentTimeMillis())
             )
         }

@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -54,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.lingxi.ai.MainViewModel
 import com.lingxi.ai.data.Course
 import com.lingxi.ai.data.Timetable
@@ -69,6 +73,7 @@ fun TimetableScreen(vm: MainViewModel, onBack: () -> Unit) {
     val ctx = LocalContext.current
     var imagePath by remember { mutableStateOf<String?>(null) }
     var rules by remember { mutableStateOf(vm.timetableRules) }
+    var editing by remember { mutableStateOf<Course?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) imagePath = MediaUtil.saveFromUri(ctx, uri)?.absolutePath
@@ -220,7 +225,7 @@ fun TimetableScreen(vm: MainViewModel, onBack: () -> Unit) {
                     )
                     SoftCard {
                         list.forEachIndexed { i, c ->
-                            CourseRow(c)
+                            CourseRow(c) { editing = c }
                             if (i != list.lastIndex) {
                                 Box(
                                     Modifier
@@ -243,12 +248,31 @@ fun TimetableScreen(vm: MainViewModel, onBack: () -> Unit) {
             }
         }
     }
+
+    editing?.let { c ->
+        CourseEditDialog(
+            course = c,
+            onDismiss = { editing = null },
+            onSave = { updated ->
+                vm.updateCourse(c, updated)
+                editing = null
+            },
+            onDelete = {
+                vm.deleteCourse(c)
+                editing = null
+            }
+        )
+    }
 }
 
 @Composable
-private fun CourseRow(c: Course) {
+private fun CourseRow(c: Course, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.width(84.dp)) {
@@ -279,5 +303,130 @@ private fun CourseRow(c: Course) {
             }
         }
         Badge("${c.weeks}".ifBlank { "每周" }, Blue)
+    }
+}
+
+// ---------------------------------------------------------------- 编辑课程
+
+@Composable
+private fun CourseEditDialog(
+    course: Course,
+    onDismiss: () -> Unit,
+    onSave: (Course) -> Unit,
+    onDelete: () -> Unit
+) {
+    var weekday by remember(course) { mutableStateOf(course.weekday) }
+    var name by remember(course) { mutableStateOf(course.name) }
+    var start by remember(course) { mutableStateOf(course.start) }
+    var end by remember(course) { mutableStateOf(course.end) }
+    var place by remember(course) { mutableStateOf(course.place) }
+    var teacher by remember(course) { mutableStateOf(course.teacher) }
+    var weeks by remember(course) { mutableStateOf(course.weeks) }
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    val timeOk = Regex("^\\d{1,2}:\\d{2}$").matches(start.trim()) &&
+        Regex("^\\d{1,2}:\\d{2}$").matches(end.trim()) &&
+        Timetable.toMin(end) > Timetable.toMin(start)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("修改课程") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("星期", style = MaterialTheme.typography.labelSmall, color = InkSoft)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (d in 1..7) {
+                        val on = weekday == d
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (on) Purple else Color(0xFFF3F1FB))
+                                .clickable { weekday = d }
+                                .padding(horizontal = 7.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                Timetable.weekdayName(d).removePrefix("周"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (on) Color.White else InkSoft
+                            )
+                        }
+                    }
+                }
+
+                EditField("课程名称", name) { name = it }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) { EditField("开始", start) { start = it } }
+                    Box(Modifier.weight(1f)) { EditField("结束", end) { end = it } }
+                }
+                if (!timeOk) {
+                    Text(
+                        "时间格式用 08:00，结束要晚于开始",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFE5484D)
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                EditField("地点", place) { place = it }
+                EditField("教师", teacher) { teacher = it }
+                EditField("周次", weeks) { weeks = it }
+
+                if (confirmDelete) {
+                    Text(
+                        "删除这节课？",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFE5484D),
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank() && timeOk,
+                onClick = {
+                    onSave(
+                        course.copy(
+                            weekday = weekday,
+                            name = name.trim(),
+                            start = start.trim(),
+                            end = end.trim(),
+                            place = place.trim(),
+                            teacher = teacher.trim(),
+                            weeks = weeks.trim()
+                        )
+                    )
+                }
+            ) { Text("保存", color = if (name.isNotBlank() && timeOk) Purple else InkSoft) }
+        },
+        dismissButton = {
+            Row {
+                TextButton({ if (confirmDelete) onDelete() else confirmDelete = true }) {
+                    Text(if (confirmDelete) "确认删除" else "删除", color = Color(0xFFE5484D))
+                }
+                TextButton(onDismiss) { Text("取消", color = InkSoft) }
+            }
+        }
+    )
+}
+
+@Composable
+private fun EditField(label: String, value: String, onChange: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = InkSoft)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Purple.copy(alpha = 0.55f),
+                unfocusedBorderColor = Color(0xFFEDEAF7),
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color(0xFFF8F7FD)
+            )
+        )
     }
 }

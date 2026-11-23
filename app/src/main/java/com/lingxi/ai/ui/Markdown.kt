@@ -43,6 +43,7 @@ private sealed interface MdBlock {
     data class Quote(val text: String) : MdBlock
     data class Code(val code: String) : MdBlock
     data class Table(val header: List<String>, val rows: List<List<String>>) : MdBlock
+    data class Math(val latex: String) : MdBlock
     data object Divider : MdBlock
     data object Gap : MdBlock
 }
@@ -73,16 +74,16 @@ fun MarkdownText(
                     color = color
                 )
 
-                is MdBlock.Para -> Text(buildInline(block.text, color), style = baseStyle, color = color)
+                is MdBlock.Para -> RichBody(block.text, color, baseStyle)
 
                 is MdBlock.Bullet -> Row(Modifier.fillMaxWidth()) {
                     Text("•  ", style = baseStyle, color = color)
-                    Text(buildInline(block.text, color), style = baseStyle, color = color)
+                    RichBody(block.text, color, baseStyle, Modifier.weight(1f))
                 }
 
                 is MdBlock.Numbered -> Row(Modifier.fillMaxWidth()) {
                     Text("${block.num}.  ", style = baseStyle, color = color)
-                    Text(buildInline(block.text, color), style = baseStyle, color = color)
+                    RichBody(block.text, color, baseStyle, Modifier.weight(1f))
                 }
 
                 is MdBlock.Quote -> Box(
@@ -92,7 +93,7 @@ fun MarkdownText(
                         .background(color.copy(alpha = 0.06f))
                         .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
-                    Text(buildInline(block.text, color), style = baseStyle, color = color.copy(alpha = 0.85f))
+                    RichBody(block.text, color.copy(alpha = 0.85f), baseStyle)
                 }
 
                 is MdBlock.Code -> Box(
@@ -113,6 +114,8 @@ fun MarkdownText(
                         color = color
                     )
                 }
+
+                is MdBlock.Math -> MathBlock(block.latex, color, baseStyle)
 
                 is MdBlock.Table -> MdTable(block.header, block.rows, color, baseStyle)
 
@@ -187,6 +190,51 @@ private fun parseMarkdown(src: String): List<MdBlock> {
         val raw = lines[i]
         val line = raw.trimEnd()
         val t = line.trim()
+
+        // 独立公式块
+        if (t.startsWith("$$") || t.startsWith("\\[")) {
+            val open = if (t.startsWith("$$")) "$$" else "\\["
+            val close = if (t.startsWith("$$")) "$$" else "\\]"
+            val body = StringBuilder(t.removePrefix(open).trim())
+            if (body.contains(close)) {
+                out.add(MdBlock.Math(body.substringBefore(close).trim()))
+                i++
+                continue
+            }
+            i++
+            var closed = false
+            while (i < lines.size) {
+                val n = lines[i]
+                if (n.contains(close)) {
+                    body.append('\n').append(n.substringBefore(close))
+                    closed = true
+                    i++
+                    break
+                }
+                body.append('\n').append(n)
+                i++
+            }
+            if (closed) out.add(MdBlock.Math(body.toString().trim()))
+            else out.add(MdBlock.Para(body.toString().trim()))
+            continue
+        }
+
+        // matrix / aligned 等环境，常有换行
+        if (t.startsWith("\\begin{")) {
+            val envEnd = t.indexOf('}')
+            val env = if (envEnd > 6) t.substring(7, envEnd) else ""
+            val endTok = "\\end{$env}"
+            val body = StringBuilder(t)
+            i++
+            var closed = t.contains(endTok)
+            while (i < lines.size && !closed) {
+                body.append('\n').append(lines[i])
+                if (lines[i].contains(endTok)) closed = true
+                i++
+            }
+            out.add(MdBlock.Math(body.toString().trim()))
+            continue
+        }
 
         // 代码块
         if (t.startsWith("```")) {
@@ -291,11 +339,44 @@ private fun splitRow(line: String): List<String> {
 
 // ---------------------------------------------------------------- 行内样式
 
-private fun buildInline(src: String, base: Color): AnnotatedString {
+internal fun buildInline(src: String, base: Color): AnnotatedString {
     val b = AnnotatedString.Builder()
     var i = 0
     while (i < src.length) {
         when {
+            src.startsWith("\\(", i) -> {
+                val end = src.indexOf("\\)", i + 2)
+                if (end > i + 2) {
+                    b.append(latexToUnicode(src.substring(i + 2, end)))
+                    i = end + 2
+                } else { b.append(src[i]); i++ }
+            }
+
+            src.startsWith("\\[", i) -> {
+                val end = src.indexOf("\\]", i + 2)
+                if (end > i + 2) {
+                    b.append(latexToUnicode(src.substring(i + 2, end)))
+                    i = end + 2
+                } else { b.append(src[i]); i++ }
+            }
+
+            src.startsWith("$$", i) -> {
+                val end = src.indexOf("$$", i + 2)
+                if (end > i + 2) {
+                    b.append(latexToUnicode(src.substring(i + 2, end)))
+                    i = end + 2
+                } else { b.append(src[i]); i++ }
+            }
+
+            src[i] == '$' -> {
+                val end = src.indexOf('$', i + 1)
+                val next = src.getOrNull(i + 1)
+                if (end > i + 1 && end - i < 300 && next != null && !next.isWhitespace()) {
+                    b.append(latexToUnicode(src.substring(i + 1, end)))
+                    i = end + 1
+                } else { b.append(src[i]); i++ }
+            }
+
             src.startsWith("**", i) -> {
                 val end = src.indexOf("**", i + 2)
                 if (end > i + 2) {
