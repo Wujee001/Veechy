@@ -1,7 +1,5 @@
 package com.lingxi.ai.pet
 
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -18,28 +16,32 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.ServiceCompat
 import com.lingxi.ai.MainActivity
 import com.lingxi.ai.R
+import com.lingxi.ai.pet.chibi.ChibiView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /**
- * 桌面小 Veechy。
+ * 桌面小 Veechy：1.2 cm 高的三维小人。
  *
- * 一个悬浮窗 + 一套行为链：呼吸、换姿势、歪头、眨眼、举手、打盹，
- * 点她会有反应；隔 1–3 小时冒一句符合人设的话，并写进待办队列，
- * 用户打开 App 后这句话会出现在当前对话里。
- *
- * 受系统限制：需要「显示在其他应用上层」权限；进程被厂商杀掉后需要重新打开 App。
+ * 人物由 ChibiView 程序化建模并实时渲染（骨骼 + 三维投影 + 体积光照），
+ * 自己会走、跳、坐、躺、挥手；点她会互动。
+ * 每隔 1–3 小时主动说一句话：这句话走模型（人设 + 真实时间 + 当前对话历史），
+ * 显示在紫蓝气泡里，同时并入当前对话。
  */
 class PetService : Service() {
 
@@ -50,34 +52,29 @@ class PetService : Service() {
 
     private lateinit var wm: WindowManager
     private var root: LinearLayout? = null
-    private lateinit var pet: ImageView
+    private lateinit var chibi: ChibiView
     private lateinit var bubble: TextView
     private lateinit var params: WindowManager.LayoutParams
 
     private val handler = Handler(Looper.getMainLooper())
-    private var bob: ObjectAnimator? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var hideBubble: Runnable? = null
-    private var poseRes = R.drawable.pet_idle
 
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
-    private val idleRunnable = object : Runnable {
-        override fun run() {
-            idleAction()
-            handler.postDelayed(this, Random.nextLong(4200, 9000))
-        }
-    }
+    private fun mm(v: Float): Int = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_MM, v, resources.displayMetrics
+    ).toInt()
 
     private val msgRunnable = object : Runnable {
         override fun run() {
             if (PetPrefs.enabled(this@PetService) && PetPrefs.messagesEnabled(this@PetService)) {
-                val text = runCatching { PetMessages.scheduled(this@PetService) }.getOrDefault("")
-                if (text.isNotBlank()) {
-                    showBubble(text, 15000)
-                    PetOutbox.push(this@PetService, text)
-                    PetBus.emit()
-                    pose(R.drawable.pet_wave)
-                    handler.postDelayed({ pose(restPose()) }, 2600)
+                scope.launch {
+                    val text = PetLineGenerator.generate(this@PetService)
+                    if (text.isNotBlank()) {
+                        showBubble(text, 16000)
+                        PetOutbox.push(this@PetService, text)
+                        PetBus.emit()
+                        chibi.wave()
+                    }
                 }
             }
             handler.postDelayed(this, nextDelay())
@@ -118,7 +115,6 @@ class PetService : Service() {
 
         if (root == null) {
             attach()
-            handler.postDelayed(idleRunnable, 1200)
             handler.postDelayed(msgRunnable, nextDelay())
         }
         return START_STICKY
@@ -126,7 +122,7 @@ class PetService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        bob?.cancel()
+        scope.cancel()
         root?.let { runCatching { wm.removeView(it) } }
         root = null
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -142,34 +138,30 @@ class PetService : Service() {
             visibility = View.GONE
             setTextColor(AColor.WHITE)
             textSize = 12.5f
-            maxWidth = dp(210)
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            maxWidth = mm(38f)
+            setPadding(mm(3f), mm(2f), mm(3f), mm(2f))
             background = GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
+                cornerRadius = mm(4f).toFloat()
                 orientation = GradientDrawable.Orientation.LEFT_RIGHT
                 colors = intArrayOf(0xE07C5CFF.toInt(), 0xE04DA3FF.toInt())
-                setStroke(dp(1), 0x66FFFFFF)
+                setStroke(1, 0x66FFFFFF)
             }
-            elevation = dp(8).toFloat()
-            setLineSpacing(dp(2).toFloat(), 1f)
+            elevation = 8f
         }
 
-        pet = ImageView(this).apply {
-            setImageResource(R.drawable.pet_idle)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            layoutParams = LinearLayout.LayoutParams(dp(132), dp(157))
+        chibi = ChibiView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(mm(26f), mm(19f))
         }
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(4), dp(4), dp(4), dp(4))
-            addView(pet)
+            addView(chibi)
             addView(bubble)
         }
 
         params = WindowManager.LayoutParams(
-            dp(212),
+            mm(40f),
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -178,7 +170,7 @@ class PetService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             val saved = PetPrefs.position(this@PetService)
-            x = saved?.first ?: (metrics.widthPixels - dp(212))
+            x = saved?.first ?: (metrics.widthPixels - mm(40f))
             y = saved?.second ?: (metrics.heightPixels / 3)
         }
 
@@ -226,14 +218,12 @@ class PetService : Service() {
         root = container
         clamp()
         runCatching { wm.updateViewLayout(container, params) }
-        startBob()
-        pose(restPose())
     }
 
     private fun clamp() {
         val m = resources.displayMetrics
-        params.x = params.x.coerceIn(0, (m.widthPixels - dp(212)).coerceAtLeast(0))
-        params.y = params.y.coerceIn(0, (m.heightPixels - dp(180)).coerceAtLeast(0))
+        params.x = params.x.coerceIn(0, (m.widthPixels - mm(40f)).coerceAtLeast(0))
+        params.y = params.y.coerceIn(0, (m.heightPixels - mm(24f)).coerceAtLeast(0))
     }
 
     private fun openApp() {
@@ -246,80 +236,11 @@ class PetService : Service() {
         }
     }
 
-    // ------------------------------------------------------------ 行为
-
-    private fun isNight(): Boolean {
-        val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        return h >= 23 || h <= 5
-    }
-
-    private fun restPose(): Int = if (isNight()) R.drawable.pet_rest else R.drawable.pet_idle
-
-    private fun startBob() {
-        bob?.cancel()
-        bob = ObjectAnimator.ofFloat(pet, "translationY", 0f, -dp(7).toFloat()).apply {
-            duration = 2200
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
-        }
-    }
-
-    private fun pose(res: Int) {
-        if (res == poseRes) return
-        poseRes = res
-        pet.animate().cancel()
-        pet.animate().alpha(0f).setDuration(110).withEndAction {
-            pet.setImageResource(res)
-            pet.animate().alpha(1f).setDuration(170).start()
-        }.start()
-    }
-
-    private fun idleAction() {
-        when (Random.nextInt(8)) {
-            0, 1 -> pose(restPose())
-            2 -> pose(R.drawable.pet_read)
-            3 -> pose(R.drawable.pet_tech)
-            4 -> tilt()
-            5 -> blink()
-            6 -> pose(if (isNight()) R.drawable.pet_dream else R.drawable.pet_wave)
-            else -> pose(R.drawable.pet_idle)
-        }
-        if (isNight() && pet.alpha > 0.9f) {
-            pet.animate().alpha(0.82f).setDuration(800).start()
-        } else if (!isNight() && pet.alpha < 0.95f) {
-            pet.animate().alpha(1f).setDuration(500).start()
-        }
-    }
-
-    private fun tilt() {
-        val angle = if (Random.nextBoolean()) 4f else -4f
-        pet.animate().rotation(angle).setDuration(600).withEndAction {
-            handler.postDelayed({
-                pet.animate().rotation(0f).setDuration(700).start()
-            }, 900)
-        }.start()
-    }
-
-    private fun blink() {
-        val current = poseRes
-        if (current == R.drawable.pet_dream) return
-        pet.setImageResource(R.drawable.pet_dream)
-        handler.postDelayed({
-            if (poseRes == current) pet.setImageResource(current)
-        }, 650)
-    }
+    // ------------------------------------------------------------ 互动
 
     private fun react() {
-        showBubble(PetMessages.tap(this), 6000)
-        pose(R.drawable.pet_wave)
-        pet.animate().rotation(-4f).setDuration(90).withEndAction {
-            pet.animate().rotation(4f).setDuration(120).withEndAction {
-                pet.animate().rotation(0f).setDuration(120).start()
-            }.start()
-        }.start()
-        handler.postDelayed({ pose(restPose()) }, 2200)
+        chibi.poke()
+        showBubble(PetMessages.tap(this), 5000)
     }
 
     private fun showBubble(text: String, holdMs: Long = 7000) {

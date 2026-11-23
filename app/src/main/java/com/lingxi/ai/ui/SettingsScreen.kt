@@ -367,7 +367,7 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text("放在桌面上", style = MaterialTheme.typography.bodyMedium, color = Ink)
                         Text(
-                            "小 Veechy 悬浮在桌面，可拖动、点一下会互动",
+                            "1.2 cm 三维小人，会走会跳会躺，点一下会互动",
                             style = MaterialTheme.typography.labelSmall,
                             color = InkSoft
                         )
@@ -406,7 +406,7 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text("定时冒一句话", style = MaterialTheme.typography.bodyMedium, color = Ink)
                         Text(
-                            "隔 1–3 小时随机说一句，气泡里先出现，打开 App 后会留在当前对话",
+                            "隔 1–3 小时说一句，走模型、顺着当前对话与人设，很短；会耗少量 token",
                             style = MaterialTheme.typography.labelSmall,
                             color = InkSoft
                         )
@@ -435,7 +435,7 @@ fun SettingsScreen(
                 if (petOn) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "小提示：点一下会说话，双击打开 App，拖动可换位置。部分系统需再允许「后台弹出界面 / 自启动」，否则锁屏或清理后台后桌宠会消失。",
+                        "小提示：点一下会回应，双击打开 App，拖动可换位置。部分系统需再允许「后台弹出界面 / 自启动」，否则清理后台后桌宠会消失。",
                         style = MaterialTheme.typography.labelSmall,
                         color = InkSoft
                     )
