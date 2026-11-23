@@ -356,6 +356,13 @@ fun SettingsScreen(
                     askNotify(ctx, notifyLauncher::launch)
                 }
 
+                // 部分系统在授予悬浮窗权限时会重启 App：回到设置页后补上启动
+                LaunchedEffect(Unit) {
+                    if (PetPrefs.takePending(ctx) && Settings.canDrawOverlays(ctx)) {
+                        enablePet()
+                    }
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("放在桌面上", style = MaterialTheme.typography.bodyMedium, color = Ink)
@@ -371,6 +378,7 @@ fun SettingsScreen(
                             if (on) {
                                 if (Settings.canDrawOverlays(ctx)) enablePet()
                                 else runCatching {
+                                    PetPrefs.markPending(ctx)
                                     overlayLauncher.launch(
                                         Intent(
                                             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,

@@ -24,6 +24,14 @@ object PetPrefs {
         sp(c).edit().putBoolean("messages", value).apply()
     }
 
+    fun markPending(c: Context) = sp(c).edit().putBoolean("pending", true).apply()
+
+    fun takePending(c: Context): Boolean {
+        if (!sp(c).getBoolean("pending", false)) return false
+        sp(c).edit().putBoolean("pending", false).apply()
+        return true
+    }
+
     fun position(c: Context): Pair<Int, Int>? {
         val x = sp(c).getInt("x", Int.MIN_VALUE)
         val y = sp(c).getInt("y", Int.MIN_VALUE)

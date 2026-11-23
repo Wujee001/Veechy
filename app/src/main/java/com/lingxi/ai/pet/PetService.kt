@@ -165,8 +165,8 @@ class PetService : Service() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(4), dp(4), dp(4), dp(4))
-            addView(bubble)
             addView(pet)
+            addView(bubble)
         }
 
         params = WindowManager.LayoutParams(
