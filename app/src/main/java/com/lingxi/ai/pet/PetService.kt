@@ -158,7 +158,6 @@ class PetService : Service() {
             setImageResource(R.drawable.pet_idle)
             scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = LinearLayout.LayoutParams(dp(132), dp(157))
-            elevation = dp(6).toFloat()
         }
 
         val container = LinearLayout(this).apply {
@@ -170,7 +169,7 @@ class PetService : Service() {
         }
 
         params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            dp(212),
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -179,7 +178,7 @@ class PetService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             val saved = PetPrefs.position(this@PetService)
-            x = saved?.first ?: (metrics.widthPixels - dp(150))
+            x = saved?.first ?: (metrics.widthPixels - dp(212))
             y = saved?.second ?: (metrics.heightPixels / 3)
         }
 
@@ -233,7 +232,7 @@ class PetService : Service() {
 
     private fun clamp() {
         val m = resources.displayMetrics
-        params.x = params.x.coerceIn(0, (m.widthPixels - dp(140)).coerceAtLeast(0))
+        params.x = params.x.coerceIn(0, (m.widthPixels - dp(212)).coerceAtLeast(0))
         params.y = params.y.coerceIn(0, (m.heightPixels - dp(180)).coerceAtLeast(0))
     }
 

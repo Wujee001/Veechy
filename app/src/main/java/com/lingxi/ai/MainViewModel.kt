@@ -162,7 +162,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 桌宠在桌面说过的话，回到 App 时并进当前对话。 */
     fun drainPetMessages() {
-        if (current == null) return
+        if (current == null || streaming) return
         val list = PetOutbox.drain(getApplication())
         if (list.isEmpty()) return
         var c = current ?: return
@@ -490,6 +490,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 streaming = false
                 current?.let { push(it) }
+                drainPetMessages()
             }
         }
     }

@@ -230,6 +230,8 @@ fun latexToUnicode(src: String): String {
                 var j = i + 1
                 while (j < src.length && src[j].isLetter()) j++
                 val cmd = src.substring(i + 1, j)
+                // \operatorname*{…}、\limsup 这类带星号的写法
+                if (j < src.length && src[j] == '*') j++
 
                 when (cmd) {
                     "frac", "dfrac", "tfrac" -> {
@@ -262,7 +264,25 @@ fun latexToUnicode(src: String): String {
                         }
                     }
 
-                    "text", "textrm", "mathrm", "operatorname", "textbf", "mathbf", "mathit" -> {
+                    "mathbb" -> {
+                        val g = readGroup(src, j)
+                        if (g != null) {
+                            g.first.forEach { ch ->
+                                sb.append(
+                                    when (ch) {
+                                        'R' -> "ℝ"; 'N' -> "ℕ"; 'Z' -> "ℤ"
+                                        'Q' -> "ℚ"; 'C' -> "ℂ"; 'P' -> "ℙ"
+                                        else -> ch.toString()
+                                    }
+                                )
+                            }
+                            i = g.second
+                        } else {
+                            i = j
+                        }
+                    }
+
+                    "text", "textrm", "mathrm", "operatorname", "textbf", "mathbf", "mathit", "mathcal", "mathfrak" -> {
                         val g = readGroup(src, j)
                         if (g != null) {
                             sb.append(g.first)
